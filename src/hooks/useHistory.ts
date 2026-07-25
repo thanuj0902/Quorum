@@ -17,7 +17,11 @@ function loadHistory(): HistoryEntry[] {
 }
 
 function saveHistory(entries: HistoryEntry[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries))
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries))
+  } catch {
+    // localStorage quota exceeded or unavailable
+  }
 }
 
 export function useHistory() {

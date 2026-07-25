@@ -87,12 +87,26 @@ export default function HowItWorks() {
                 >
                   <div className="text-center">
                     <div className="relative inline-flex mb-5">
-                      <div className={`w-16 h-16 rounded-2xl ${c.bg} border ${c.border} ${c.hover} flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg`}>
+                      {/* Floating glow behind icon */}
+                      <motion.div
+                        animate={{ scale: [1, 1.3, 1], opacity: [0.15, 0.35, 0.15] }}
+                        transition={{ duration: 4, delay: i * 0.8, repeat: Infinity, ease: 'easeInOut' }}
+                        className={`absolute inset-0 rounded-2xl blur-xl ${c.bg}`}
+                        aria-hidden="true"
+                      />
+                      <div className={`relative w-16 h-16 rounded-2xl ${c.bg} border ${c.border} ${c.hover} flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg`}>
                         <step.icon className={`w-6 h-6 ${c.text}`} strokeWidth={1.5} />
                       </div>
                       <span className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-base border border-border text-[10px] text-text-secondary font-mono flex items-center justify-center">
                         {i + 1}
                       </span>
+                      {/* Floating dot */}
+                      <motion.div
+                        animate={{ y: [0, -6, 0], opacity: [0.3, 0.6, 0.3] }}
+                        transition={{ duration: 3 + i, delay: i * 0.5, repeat: Infinity, ease: 'easeInOut' }}
+                        className={`absolute -bottom-3 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full ${c.text} bg-current opacity-30`}
+                        aria-hidden="true"
+                      />
                     </div>
 
                     <h3 className="font-display text-base font-semibold mb-1">{step.title}</h3>

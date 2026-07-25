@@ -1,11 +1,12 @@
 import { useState, useCallback } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Save, FileDown, Share2, History } from 'lucide-react'
+import { Save, FileDown, Share2, History, Mic, MicOff, Layers } from 'lucide-react'
 import Logo from '../ui/Logo'
 import PipelineVisualizer from './PipelineVisualizer'
 import ConfidenceReport from '../Report/ConfidenceReport'
 import SourceTrustLedger from '../Report/SourceTrustLedger'
 import { exportReportAsPDF } from '../../utils/pdf'
+import { useVoiceInput } from '../../hooks/useVoiceInput'
 import type { PipelinePhase, PipelineState, VerificationReport } from '../../types'
 
 interface PipelineViewProps {
@@ -15,12 +16,14 @@ interface PipelineViewProps {
   error: string | null
   onBack: () => void
   onAnalyze: (topic: string) => void
-  onSaveReport: () => void
+  onSaveReport: () => string | undefined
   onViewHistory: () => void
+  onOpenBatch?: () => void
 }
 
-export default function PipelineView({ phase, pipelineState, report, error, onBack, onAnalyze, onSaveReport, onViewHistory }: PipelineViewProps) {
+export default function PipelineView({ phase, pipelineState, report, error, onBack, onAnalyze, onSaveReport, onViewHistory, onOpenBatch }: PipelineViewProps) {
   const [topic, setTopic] = useState<string>('Impact of artificial intelligence on healthcare diagnostics')
+  const { isListening, transcript, isSupported: voiceSupported, startListening, stopListening, resetTranscript } = useVoiceInput()
 
   const handleSubmit = useCallback(() => {
     const trimmed = topic.trim()
@@ -28,8 +31,55 @@ export default function PipelineView({ phase, pipelineState, report, error, onBa
     onAnalyze(trimmed)
   }, [topic, phase, onAnalyze])
 
+  const handleVoiceToggle = useCallback(() => {
+    if (isListening) {
+      stopListening()
+    } else {
+      startListening()
+    }
+  }, [isListening, startListening, stopListening])
+
+  const handleVoiceConfirm = useCallback(() => {
+    if (transcript) {
+      setTopic(transcript)
+      resetTranscript()
+      stopListening()
+    }
+  }, [transcript, resetTranscript, stopListening])
+
   return (
     <>
+      {/* Floating background orbs */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
+        <motion.div
+          animate={{ x: [0, 30, -20, 0], y: [0, -25, 15, 0], scale: [1, 1.1, 0.95, 1] }}
+          transition={{ duration: 20, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute top-[10%] left-[5%] w-[400px] h-[400px] rounded-full blur-[140px]"
+          style={{ background: 'radial-gradient(circle, rgba(124,58,237,0.08) 0%, transparent 70%)' }}
+        />
+        <motion.div
+          animate={{ x: [0, -25, 20, 0], y: [0, 20, -15, 0], scale: [1, 0.9, 1.1, 1] }}
+          transition={{ duration: 25, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute bottom-[10%] right-[5%] w-[350px] h-[350px] rounded-full blur-[130px]"
+          style={{ background: 'radial-gradient(circle, rgba(52,211,153,0.05) 0%, transparent 70%)' }}
+        />
+        {/* Floating particles */}
+        {[...Array(6)].map((_, i) => (
+          <motion.div
+            key={`pipeline-particle-${i}`}
+            animate={{ y: [0, -15 - i * 3, 0], x: [0, (i % 2 === 0 ? 8 : -8), 0], opacity: [0.1, 0.3, 0.1] }}
+            transition={{ duration: 6 + i * 1.5, delay: i * 0.8, repeat: Infinity, ease: 'easeInOut' }}
+            className="absolute rounded-full bg-accent/20"
+            style={{
+              width: 2 + (i % 3),
+              height: 2 + (i % 3),
+              top: `${15 + i * 12}%`,
+              left: `${10 + i * 15}%`,
+            }}
+          />
+        ))}
+      </div>
+
       <nav className="sticky top-0 z-50 px-6 py-4 bg-base/80 backdrop-blur-xl border-b border-border/50" role="navigation" aria-label="Pipeline navigation">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <Logo onClick={onBack} />
@@ -84,7 +134,10 @@ export default function PipelineView({ phase, pipelineState, report, error, onBa
             </button>
             <button
               onClick={() => {
-                navigator.clipboard.writeText(window.location.href)
+                const id = onSaveReport()
+                if (id) {
+                  navigator.clipboard.writeText(`${window.location.origin}#${id}`).catch(() => {})
+                }
               }}
               className="flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-medium transition-all duration-200 hover:border-accent/30"
               style={{ background: '#18181D', borderColor: '#222230', color: '#FBBF24' }}
@@ -100,6 +153,16 @@ export default function PipelineView({ phase, pipelineState, report, error, onBa
               <History className="w-3.5 h-3.5" />
               View History
             </button>
+            {onOpenBatch && (
+              <button
+                onClick={onOpenBatch}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-medium transition-all duration-200 hover:border-accent/30"
+                style={{ background: '#18181D', borderColor: '#222230', color: '#FB923C' }}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                Batch Verify
+              </button>
+            )}
           </div>
         </motion.div>
       )}
@@ -130,14 +193,39 @@ export default function PipelineView({ phase, pipelineState, report, error, onBa
             <input
               id="topic-input"
               type="text"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              placeholder="Enter a research topic or claim..."
+              value={isListening && transcript ? transcript : topic}
+              onChange={(e) => { if (!isListening) setTopic(e.target.value) }}
+              placeholder={isListening ? 'Listening...' : 'Enter a research topic or claim...'}
               maxLength={500}
-              className="w-full bg-surface border border-border rounded-2xl px-5 py-4 text-sm font-body placeholder:text-text-secondary/30 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-all duration-300"
+              className="w-full bg-surface border border-border rounded-2xl px-5 py-4 pr-12 text-sm font-body placeholder:text-text-secondary/30 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-all duration-300"
             />
             <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-accent/5 to-transparent opacity-0 group-focus-within:opacity-100 transition-opacity duration-300 pointer-events-none" aria-hidden="true" />
           </div>
+          {voiceSupported && (
+            <div className="flex items-center gap-2">
+              {isListening && transcript && (
+                <motion.button
+                  type="button"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  onClick={handleVoiceConfirm}
+                  className="px-3 py-2 bg-green/10 border border-green/20 text-green text-xs font-medium rounded-xl hover:bg-green/20 transition-colors"
+                >
+                  Use this
+                </motion.button>
+              )}
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleVoiceToggle}
+                className={`p-3 rounded-xl border transition-all duration-300 ${isListening ? 'bg-red/10 border-red/30 text-red shadow-lg shadow-red/10' : 'bg-surface border-border text-text-secondary hover:text-accent hover:border-accent/30'}`}
+                aria-label={isListening ? 'Stop voice input' : 'Start voice input'}
+              >
+                {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </motion.button>
+            </div>
+          )}
           <motion.button
             type="submit"
             disabled={phase === 'running' || !topic.trim()}

@@ -16,15 +16,17 @@ function AnimatedNumber({ value, duration = 1200 }: { value: number; duration?: 
   const [display, setDisplay] = useState<number>(0)
 
   useEffect(() => {
+    let frameId: number
     const startTime = Date.now()
     const tick = () => {
       const elapsed = Date.now() - startTime
       const progress = Math.min(elapsed / duration, 1)
       const eased = 1 - Math.pow(1 - progress, 3)
       setDisplay(Math.round(eased * value))
-      if (progress < 1) requestAnimationFrame(tick)
+      if (progress < 1) frameId = requestAnimationFrame(tick)
     }
-    requestAnimationFrame(tick)
+    frameId = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frameId)
   }, [value, duration])
 
   return <span>{display}</span>

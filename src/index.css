@@ -95,6 +95,50 @@
   50% { transform: translateY(-8px); }
 }
 
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  25% { transform: translateY(-6px) rotate(1deg); }
+  50% { transform: translateY(-12px) rotate(0deg); }
+  75% { transform: translateY(-6px) rotate(-1deg); }
+}
+
+@keyframes float-drift {
+  0%, 100% { transform: translate(0px, 0px) rotate(0deg); }
+  25% { transform: translate(6px, -8px) rotate(2deg); }
+  50% { transform: translate(-4px, -14px) rotate(-1deg); }
+  75% { transform: translate(3px, -6px) rotate(1deg); }
+}
+
+@keyframes float-orbit {
+  0% { transform: translate(0px, 0px); }
+  25% { transform: translate(10px, -6px); }
+  50% { transform: translate(0px, -12px); }
+  75% { transform: translate(-10px, -6px); }
+}
+
+@keyframes float-glow {
+  0%, 100% { transform: translateY(0px); opacity: 0.4; }
+  50% { transform: translateY(-10px); opacity: 0.8; }
+}
+
+@keyframes float-tilt {
+  0%, 100% { transform: translateY(0px) rotate(0deg) scale(1); }
+  33% { transform: translateY(-6px) rotate(1.5deg) scale(1.02); }
+  66% { transform: translateY(-3px) rotate(-1deg) scale(0.99); }
+}
+
+@keyframes float-bob {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+}
+
+@keyframes float-sway {
+  0%, 100% { transform: translateX(0px) translateY(0px); }
+  25% { transform: translateX(4px) translateY(-4px); }
+  50% { transform: translateX(-2px) translateY(-8px); }
+  75% { transform: translateX(3px) translateY(-3px); }
+}
+
 @keyframes pulse-ring {
   0% { transform: scale(0.9); opacity: 1; }
   100% { transform: scale(1.5); opacity: 0; }
@@ -105,8 +149,47 @@
   100% { background-position: 200% 0; }
 }
 
+@keyframes morph {
+  0%, 100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+  25% { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
+  50% { border-radius: 50% 60% 30% 60% / 30% 40% 70% 60%; }
+  75% { border-radius: 60% 30% 60% 40% / 70% 50% 40% 60%; }
+}
+
 .animate-float {
   animation: float 6s ease-in-out infinite;
+}
+
+.animate-float-slow {
+  animation: float-slow 8s ease-in-out infinite;
+}
+
+.animate-float-drift {
+  animation: float-drift 10s ease-in-out infinite;
+}
+
+.animate-float-orbit {
+  animation: float-orbit 12s ease-in-out infinite;
+}
+
+.animate-float-glow {
+  animation: float-glow 5s ease-in-out infinite;
+}
+
+.animate-float-tilt {
+  animation: float-tilt 7s ease-in-out infinite;
+}
+
+.animate-float-bob {
+  animation: float-bob 4s ease-in-out infinite;
+}
+
+.animate-float-sway {
+  animation: float-sway 9s ease-in-out infinite;
+}
+
+.animate-morph {
+  animation: morph 8s ease-in-out infinite;
 }
 
 .animate-pulse-ring {

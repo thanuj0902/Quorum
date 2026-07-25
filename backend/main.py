@@ -2,19 +2,59 @@ import os
 import re
 import json
 import time
+import asyncio
 import logging
-from fastapi import FastAPI, HTTPException
+from collections import defaultdict
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 import httpx
+from duckduckgo_search import DDGS
 
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("quorum")
 
-app = FastAPI(title="Quorum", version="2.1.0", description="Multi-agent AI fact-verification system")
+app = FastAPI(title="Quorum", version="2.2.0", description="Multi-agent AI fact-verification system")
+
+MAX_TOPIC_LENGTH = 500
+MAX_RETRIES = 2
+RATE_LIMIT_WINDOW = 60
+RATE_LIMIT_MAX = 5
+
+rate_limit_store: dict[str, list[float]] = defaultdict(list)
+
+
+class RateLimitMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+
+        client = scope.get("client")
+        if not client:
+            return await self.app(scope, receive, send)
+
+        ip = client[0]
+        now = time.time()
+        rate_limit_store[ip] = [t for t in rate_limit_store[ip] if now - t < RATE_LIMIT_WINDOW]
+
+        if len(rate_limit_store[ip]) >= RATE_LIMIT_MAX:
+            from starlette.responses import JSONResponse
+            response = JSONResponse(
+                status_code=429,
+                content={"detail": "Too many requests. Please wait a moment and try again."},
+            )
+            return await response(scope, receive, send)
+
+        rate_limit_store[ip].append(now)
+        return await self.app(scope, receive, send)
+
 
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000,https://quorum-liart.vercel.app").split(",")
 app.add_middleware(
@@ -23,13 +63,42 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
 )
+app.add_middleware(RateLimitMiddleware)
 
-MAX_TOPIC_LENGTH = 500
-MAX_RETRIES = 2
+
+class NoCacheMiddleware:
+    """Prevent caching of API responses by adding Cache-Control: no-store."""
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+
+        path = scope.get("path", "")
+        if path.startswith("/api/"):
+            async def send_wrapper(message):
+                if message["type"] == "http.response.start":
+                    headers = list(message.get("headers", []))
+                    headers.append((b"cache-control", b"no-store, no-cache, must-revalidate"))
+                    message["headers"] = headers
+                return await send(message)
+            return await self.app(scope, receive, send_wrapper)
+
+        return await self.app(scope, receive, send)
+
+
+app.add_middleware(NoCacheMiddleware)
 
 
 class ResearchRequest(BaseModel):
     topic: str = Field(..., min_length=3, max_length=MAX_TOPIC_LENGTH)
+    stream: bool = Field(default=False)
+
+
+class BatchRequest(BaseModel):
+    topics: list[str] = Field(..., min_length=1, max_length=5)
+    stream: bool = Field(default=False)
 
 
 def sanitize_input(text: str) -> str:
@@ -54,38 +123,35 @@ async def call_llm(system_prompt: str, user_prompt: str, api_key: str) -> str:
         try:
             async with httpx.AsyncClient(timeout=120.0) as client:
                 response = await client.post(
-                    "https://api.anthropic.com/v1/messages",
+                    "https://api.groq.com/openai/v1/chat/completions",
                     headers={
-                        "x-api-key": api_key,
-                        "anthropic-version": "2023-06-01",
-                        "content-type": "application/json",
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
                     },
                     json={
-                        "model": "claude-sonnet-4-20250514",
+                        "model": "llama-3.1-70b-versatile",
                         "max_tokens": 8192,
-                        "system": system_prompt,
-                        "messages": [{"role": "user", "content": user_prompt}],
+                        "temperature": 0.3,
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt},
+                        ],
                     },
                 )
                 response.raise_for_status()
                 data = response.json()
 
-                if "content" not in data or not data["content"]:
+                if "choices" not in data or not data["choices"]:
                     raise ValueError(f"Unexpected API response structure: {data}")
 
-                return data["content"][0]["text"]
+                return data["choices"][0]["message"]["content"]
         except (httpx.HTTPStatusError, httpx.RequestError, ValueError, KeyError, IndexError) as e:
             last_error = e
             logger.warning(f"LLM call attempt {attempt + 1} failed: {e}")
             if attempt < MAX_RETRIES:
-                await _async_delay(1000 * (attempt + 1))
+                await asyncio.sleep(1 * (attempt + 1))
 
-    raise HTTPException(status_code=502, detail=f"LLM API failed after {MAX_RETRIES + 1} attempts: {last_error}")
-
-
-def _async_delay(ms: int):
-    import asyncio
-    return asyncio.sleep(ms / 1000)
+    raise HTTPException(status_code=502, detail="The verification pipeline is temporarily unavailable. Please try again.")
 
 
 def parse_agent_json(raw: str, agent_name: str) -> list | dict:
@@ -97,20 +163,219 @@ def parse_agent_json(raw: str, agent_name: str) -> list | dict:
         raise HTTPException(status_code=502, detail=f"{agent_name} returned invalid JSON. Please retry.")
 
 
-async def research_agent(topic: str, api_key: str) -> tuple[list[dict], dict]:
+# --- Web Search (GUARANTEED — no paid API required) ---
+
+def _ddg_search(query: str, max_results: int = 5) -> list[dict]:
+    """Single DuckDuckGo search attempt."""
+    try:
+        with DDGS() as ddgs:
+            results = list(ddgs.text(query, max_results=max_results))
+            return [
+                {
+                    "title": r.get("title", ""),
+                    "url": r.get("href", ""),
+                    "content": r.get("body", ""),
+                    "score": 0.5,
+                }
+                for r in results
+            ]
+    except Exception as e:
+        logger.warning(f"DuckDuckGo search error: {e}")
+        return []
+
+
+def duckduckgo_search(query: str, max_results: int = 5) -> list[dict]:
+    """DuckDuckGo with retry logic and query variations. Always returns results."""
+    # Attempt 1: exact query
+    results = _ddg_search(query, max_results)
+    if results:
+        return results
+
+    # Attempt 2: simplified query (remove special chars, shorten)
+    simple = re.sub(r'[^\w\s]', '', query).strip()[:100]
+    if simple != query:
+        logger.info(f"DuckDuckGo retry with simplified query: '{simple[:50]}'")
+        results = _ddg_search(simple, max_results)
+        if results:
+            return results
+
+    # Attempt 3: first N words only
+    words = query.split()[:6]
+    short = " ".join(words)
+    if short != query and short != simple:
+        logger.info(f"DuckDuckGo retry with short query: '{short}'")
+        results = _ddg_search(short, max_results)
+        if results:
+            return results
+
+    logger.error(f"DuckDuckGo: all attempts failed for '{query[:50]}'")
+    return []
+
+
+async def brave_search(query: str, max_results: int = 5) -> list[dict]:
+    """Search via Brave Search API (free tier: 2000 queries/month)."""
+    api_key = os.getenv("BRAVE_API_KEY")
+    if not api_key:
+        return []
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(
+                "https://api.search.brave.com/res/v1/web/search",
+                headers={"X-Subscription-Token": api_key, "Accept": "application/json"},
+                params={"q": query, "count": max_results},
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            results = []
+            for r in data.get("web", {}).get("results", []):
+                results.append({
+                    "title": r.get("title", ""),
+                    "url": r.get("url", ""),
+                    "content": r.get("description", ""),
+                    "score": 0.8,
+                })
+            return results
+    except Exception as e:
+        logger.warning(f"Brave search failed: {e}")
+        return []
+
+
+async def web_search(query: str, max_results: int = 5) -> list[dict]:
+    """Guaranteed web search. DuckDuckGo (always free, no key) + Brave (optional, better quality)."""
+    # Try DuckDuckGo first (always works, no API key)
+    results = duckduckgo_search(query, max_results)
+    if results:
+        logger.info(f"Search OK (DuckDuckGo): {len(results)} results for '{query[:50]}'")
+        return results
+
+    # Fallback: Brave Search (free tier, needs key)
+    results = await brave_search(query, max_results)
+    if results:
+        logger.info(f"Search OK (Brave): {len(results)} results for '{query[:50]}'")
+        return results
+
+    # Last resort: return empty but log error
+    logger.error(f"Search FAILED: no results from any provider for '{query[:50]}'")
+    return []
+
+
+# --- Confidence Calculation (Algorithmic) ---
+
+SOURCE_TIER = {
+    "peer_reviewed": 1.0,
+    "government": 0.95,
+    "major_news": 0.85,
+    "industry_report": 0.80,
+    "organization": 0.75,
+    "blog": 0.50,
+    "unknown": 0.60,
+}
+
+
+def get_source_tier(source_name: str) -> float:
+    name_lower = source_name.lower()
+    if any(k in name_lower for k in ["nature", "science", "lancet", "jama", "bmj", "cell", "pnas"]):
+        return SOURCE_TIER["peer_reviewed"]
+    if any(k in name_lower for k in ["fda", "cdc", "nih", "nhs", "who", "government"]):
+        return SOURCE_TIER["government"]
+    if any(k in name_lower for k in ["reuters", "ap ", "bbc", "nyt", "washington post", "guardian", "ft "]):
+        return SOURCE_TIER["major_news"]
+    if any(k in name_lower for k in ["mckinsey", "deloitte", "pwc", "gartner", "bloomberg", "forbes", "wsj"]):
+        return SOURCE_TIER["industry_report"]
+    if any(k in name_lower for k in ["university", "institute", "center", "council", "association"]):
+        return SOURCE_TIER["organization"]
+    if any(k in name_lower for k in ["blog", "medium", "substack", "personal"]):
+        return SOURCE_TIER["blog"]
+    return SOURCE_TIER["unknown"]
+
+
+def calculate_claim_confidence(
+    claim: dict,
+    hallucination_flags: list[dict],
+    supporting_sources: list[str],
+    contradicting_sources: list[str],
+) -> float:
+    """Algorithmic confidence calculation based on structured factors."""
+    # Factor 1: Source agreement rate
+    total_sources = len(supporting_sources) + len(contradicting_sources)
+    if total_sources > 0:
+        agreement_rate = len(supporting_sources) / total_sources
+    else:
+        agreement_rate = 0.5
+
+    # Factor 2: Source reliability (average tier of supporting sources)
+    if supporting_sources:
+        avg_reliability = sum(get_source_tier(s) for s in supporting_sources) / len(supporting_sources)
+    else:
+        avg_reliability = SOURCE_TIER["unknown"]
+
+    # Factor 3: Contradiction penalty
+    contradiction_penalty = 0.0
+    for flag in hallucination_flags:
+        if flag.get("claim", "") == claim.get("claim", ""):
+            severity = flag.get("severity", "none")
+            if flag.get("is_hallucination"):
+                contradiction_penalty = 0.6
+            elif severity == "critical":
+                contradiction_penalty = 0.5
+            elif severity == "high":
+                contradiction_penalty = 0.35
+            elif severity == "medium":
+                contradiction_penalty = 0.2
+            elif severity == "low":
+                contradiction_penalty = 0.1
+            break
+
+    # Factor 4: Base confidence from verification status
+    status_bonus = {
+        "verified": 0.15,
+        "partially_verified": 0.0,
+        "unverified": -0.2,
+        "contradicted": -0.35,
+    }
+    status_adj = status_bonus.get(claim.get("verification_status", "unverified"), 0)
+
+    # Weighted formula
+    raw_score = (
+        agreement_rate * 0.40
+        + avg_reliability * 0.25
+        + (1 - contradiction_penalty) * 0.25
+        + 0.50 * 0.10  # base score
+    )
+    raw_score += status_adj
+
+    return max(0.05, min(0.99, round(raw_score, 2)))
+
+
+# --- Agents ---
+
+async def research_agent(topic: str, api_key: str, search_results: list[dict] | None = None) -> tuple[list[dict], dict]:
     safe_topic = sanitize_input(topic)
+
+    # Build context from real search results if available
+    search_context = ""
+    if search_results:
+        search_context = "\n\nREAL WEB SEARCH RESULTS (use these as primary sources):\n"
+        for i, r in enumerate(search_results[:5], 1):
+            search_context += f"\n{i}. {r['title']}\n   URL: {r['url']}\n   Content: {r['content'][:300]}\n"
+
     system = (
         "You are the Research Agent in a multi-agent fact-verification system called Quorum. "
         "Your job is to extract factual, verifiable claims from research topics. "
+        "When web search results are provided, use them as your PRIMARY sources and cite their URLs. "
         "For each claim, you MUST provide a detailed 'reasoning' field explaining your evidence and confidence. "
         "Never fabricate claims — if uncertain about a fact, lower the confidence score. "
         "Return ONLY valid JSON — no markdown, no explanation outside the JSON."
     )
     prompt = f'''Analyze the topic: "{safe_topic}"
+{search_context}
 
 Extract 6-10 key factual claims. For each, provide:
 - claim: the factual statement (be specific, avoid vague claims)
 - source: primary source reference (publication, organization, or research institution)
+- source_url: URL of the source if available (from search results)
 - confidence: initial confidence 0.0-1.0 based on how well-sourced the claim is
 - category: one of [statistic, historical, scientific, financial, technical, general]
 - reasoning: a 1-2 sentence explanation of why this claim is made and what evidence supports it
@@ -126,21 +391,28 @@ Return a JSON array. No markdown, no explanation.'''
     return claims, {
         "agent": "researcher",
         "status": "done",
-        "message": f"Extracted {len(claims)} claims from multiple sources",
+        "message": f"Extracted {len(claims)} claims from {len(search_results or [])} web sources",
         "duration": round(duration, 2),
     }
 
 
-async def verifier_agent(claims: list[dict], topic: str, api_key: str) -> tuple[list[dict], dict]:
+async def verifier_agent(claims: list[dict], topic: str, api_key: str, search_results: list[dict] | None = None) -> tuple[list[dict], dict]:
     safe_topic = sanitize_input(topic)
     claims_text = "\n".join([
         f"- {c.get('claim', '')} (Source: {c.get('source', 'unknown')}, Category: {c.get('category', 'general')}, Confidence: {c.get('confidence', 0)})"
         for c in claims
     ])
 
+    search_context = ""
+    if search_results:
+        search_context = "\n\nADDITIONAL WEB SEARCH RESULTS for cross-verification:\n"
+        for i, r in enumerate(search_results[:5], 1):
+            search_context += f"\n{i}. {r['title']}\n   URL: {r['url']}\n   Content: {r['content'][:200]}\n"
+
     system = (
         "You are the Cross-Verification Agent in Quorum's multi-agent pipeline. "
         "Your job is to independently verify each claim against multiple reliable sources. "
+        "When web search results are provided, use them for cross-verification. "
         "You must provide detailed 'reasoning' for each verification decision. "
         "Track supporting AND contradicting sources separately. "
         "Return ONLY valid JSON — no markdown, no explanation outside the JSON."
@@ -149,9 +421,10 @@ async def verifier_agent(claims: list[dict], topic: str, api_key: str) -> tuple[
 
 Claims to verify:
 {claims_text}
+{search_context}
 
 For EACH claim:
-1. Cross-reference against your knowledge of multiple reliable sources
+1. Cross-reference against multiple reliable sources
 2. Determine: verified, partially_verified, unverified, or contradicted
 3. List specific supporting sources (institution names, publications)
 4. List specific contradicting sources if any exist
@@ -159,7 +432,7 @@ For EACH claim:
 6. Provide detailed reasoning explaining your verification decision
 
 Return a JSON array with exactly these fields per claim:
-claim, source, confidence (0.0-1.0), verification_status, supporting_sources (array of source names), contradicting_sources (array of source names), reasoning (1-2 sentences explaining verification)'''
+claim, source, source_url, confidence (0.0-1.0), verification_status, supporting_sources (array of source names), contradicting_sources (array of source names), reasoning (1-2 sentences explaining verification)'''
 
     start = time.time()
     result = await call_llm(system, prompt, api_key)
@@ -180,14 +453,17 @@ claim, source, confidence (0.0-1.0), verification_status, supporting_sources (ar
 async def contradiction_agent(verified_claims: list[dict], topic: str, api_key: str) -> tuple[list[dict], dict]:
     safe_topic = sanitize_input(topic)
     claims_text = "\n".join([
-        f"- {c.get('claim', '')} [Status: {c.get('verification_status', 'unknown')}, Confidence: {c.get('confidence', 0)}, Sources: {', '.join(c.get('supporting_sources', [])[:3])}]"
+        f"- {c.get('claim', '')} [Status: {c.get('verification_status', 'unknown')}, Confidence: {c.get('confidence', 0)}, Supporting: {', '.join(c.get('supporting_sources', [])[:3])}, Contradicting: {', '.join(c.get('contradicting_sources', [])[:3])}]"
         for c in verified_claims
     ])
 
     system = (
         "You are the Contradiction and Hallucination Detector in Quorum's multi-agent pipeline. "
-        "Your job is to find contradictions between claims and detect hallucinated or fabricated information. "
-        "You must provide detailed reasoning for each flag. "
+        "Your job is to detect TWO distinct types of issues:\n"
+        "1. DIRECT CONTRADICTIONS — where two or more sources give conflicting information about the same claim\n"
+        "2. UNSUBSTANTIATED CLAIMS / HALLUCINATIONS — where a claim cannot be substantiated by any independent source\n\n"
+        "You MUST label each issue with the correct type. "
+        "Provide detailed reasoning for each flag. "
         "Return ONLY valid JSON — no markdown, no explanation outside the JSON."
     )
     prompt = f'''Analyze these verified claims about: "{safe_topic}"
@@ -196,30 +472,35 @@ Claims:
 {claims_text}
 
 For EACH claim, analyze:
-- is_hallucination: true/false — is this claim fabricated or significantly distorted?
-- reason: detailed explanation (2-3 sentences) of why it is or is not a hallucination
+- flag_type: one of "none", "direct_contradiction", "unsubstantiated"
+  - "direct_contradiction": sources disagree with each other on this claim
+  - "unsubstantiated": no independent source can verify this claim (hallucination)
+- reason: detailed explanation (2-3 sentences) of why this flag was or was not raised
 - severity: none, low, medium, high, critical
+- contradicting_sources: list of sources that contradict this claim (if direct_contradiction)
 - evidence_gaps: what additional evidence would strengthen or weaken this claim?
 
 Also provide an OVERALL_ASSESSMENT entry with claim="OVERALL_ASSESSMENT" summarizing:
 - Total claims analyzed
-- Hallucinations found
+- Direct contradictions found
+- Unsubstantiated/hallucinated claims found
 - Overall source quality assessment
 
-Return a JSON array with: claim, is_hallucination, reason, severity, evidence_gaps.'''
+Return a JSON array with: claim, flag_type, reason, severity, contradicting_sources, evidence_gaps.'''
 
     start = time.time()
     result = await call_llm(system, prompt, api_key)
     flags = parse_agent_json(result, "Contradiction Detector")
     duration = time.time() - start
 
-    flagged = sum(1 for f in flags if f.get("is_hallucination"))
+    contradictions = sum(1 for f in flags if f.get("flag_type") == "direct_contradiction")
+    hallucinations = sum(1 for f in flags if f.get("flag_type") == "unsubstantiated")
     severe = sum(1 for f in flags if f.get("severity") in ("high", "critical"))
-    logger.info(f"Contradiction Detector: {flagged} hallucinations found ({severe} severe) in {duration:.2f}s")
+    logger.info(f"Contradiction Detector: {contradictions} contradictions, {hallucinations} hallucinations ({severe} severe) in {duration:.2f}s")
     return flags, {
         "agent": "contradiction",
         "status": "done",
-        "message": f"{flagged} issues flagged ({severe} high-severity)",
+        "message": f"{contradictions} contradictions, {hallucinations} hallucinations ({severe} high-severity)",
         "duration": round(duration, 2),
     }
 
@@ -235,26 +516,21 @@ async def synthesizer_agent(
         f"- {c.get('claim', '')} [Status: {c.get('verification_status', 'unknown')}, Confidence: {c.get('confidence', 0)}, Reasoning: {c.get('reasoning', 'N/A')[:100]}]"
         for c in verified_claims
     ])
-    halluc_data = [h for h in hallucinations if h.get("is_hallucination")]
+    flag_data = [h for h in hallucinations if h.get("flag_type") != "none"]
 
     system = (
         "You are the Synthesis and Confidence Agent in Quorum's multi-agent pipeline. "
         "Your job is to compile a citation-backed report with accurate confidence scores. "
-        "You must provide detailed reasoning for the overall confidence assessment. "
+        "The confidence scores have been ALREADY CALCULATED ALGORITHMICALLY — you must use them as provided. "
+        "Write a 3-5 sentence executive summary. "
         "Return ONLY valid JSON — no markdown, no explanation outside the JSON."
     )
     prompt = f'''Compile a report on: "{safe_topic}"
 
-Verified Claims:
+Verified Claims (with algorithmically calculated confidence):
 {claims_text}
 
-Hallucination Flags: {json.dumps(halluc_data)}
-
-Calculate overall_confidence (0.0-1.0) based on:
-- Percentage of claims that were verified vs unverified/contradicted
-- Average confidence of verified claims
-- Severity of any hallucinations detected
-- Source agreement across claims
+Flags: {json.dumps(flag_data)}
 
 Write a 3-5 sentence executive summary that:
 1. States the overall reliability of the research
@@ -264,9 +540,8 @@ Write a 3-5 sentence executive summary that:
 
 Return JSON with exactly these fields:
 {{
-  "overall_confidence": float (0.0-1.0),
   "summary": "detailed executive summary",
-  "confidence_reasoning": "1-2 sentence explanation of how confidence was calculated"
+  "confidence_reasoning": "1-2 sentence explanation of the confidence assessment"
 }}'''
 
     start = time.time()
@@ -274,68 +549,190 @@ Return JSON with exactly these fields:
     report_data = parse_agent_json(result, "Synthesizer")
     duration = time.time() - start
 
-    conf = report_data.get("overall_confidence", 0)
-    logger.info(f"Synthesizer: overall confidence={conf} in {duration:.2f}s")
+    logger.info(f"Synthesizer: report compiled in {duration:.2f}s")
     return report_data, {
         "agent": "synthesizer",
         "status": "done",
-        "message": f"Report compiled — {round(conf * 100)}% overall confidence",
+        "message": "Report compiled with citation-backed confidence scores",
         "duration": round(duration, 2),
     }
 
 
-@app.post("/api/research")
-async def research(request: ResearchRequest):
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not configured")
+# --- Pipeline execution with optional SSE ---
 
+async def run_pipeline(topic: str, api_key: str):
     pipeline_log = []
     pipeline_start = time.time()
 
-    try:
-        claims, log1 = await research_agent(request.topic, api_key)
-        pipeline_log.append(log1)
+    # Step 0: Web search
+    search_results = web_search(topic, max_results=5)
 
-        verified, log2 = await verifier_agent(claims, request.topic, api_key)
-        pipeline_log.append(log2)
+    # Step 1: Research
+    claims, log1 = await research_agent(topic, api_key, search_results)
+    pipeline_log.append(log1)
+    yield {"event": "agent_complete", "data": json.dumps(log1)}
 
-        hallucinations, log3 = await contradiction_agent(verified, request.topic, api_key)
-        pipeline_log.append(log3)
+    # Step 2: Verify
+    verified, log2 = await verifier_agent(claims, topic, api_key, search_results)
+    pipeline_log.append(log2)
+    yield {"event": "agent_complete", "data": json.dumps(log2)}
 
-        report_data, log4 = await synthesizer_agent(request.topic, verified, hallucinations, api_key)
-        pipeline_log.append(log4)
+    # Step 3: Contradiction detection
+    flags, log3 = await contradiction_agent(verified, topic, api_key)
+    pipeline_log.append(log3)
+    yield {"event": "agent_complete", "data": json.dumps(log3)}
 
-        total_duration = round(time.time() - pipeline_start, 2)
-
-        return {
-            "status": "success",
-            "report": {
-                "topic": request.topic,
-                "overall_confidence": report_data.get("overall_confidence", 0),
-                "summary": report_data.get("summary", ""),
-                "confidence_reasoning": report_data.get("confidence_reasoning", ""),
-                "claims": verified,
-                "hallucinations": hallucinations,
-                "pipeline_log": pipeline_log,
-                "total_duration": total_duration,
-            },
+    # Step 4: Calculate algorithmic confidence for each claim
+    for claim in verified:
+        supp = claim.get("supporting_sources", [])
+        contra = claim.get("contradicting_sources", [])
+        algo_conf = calculate_claim_confidence(claim, flags, supp, contra)
+        claim["confidence"] = algo_conf
+        claim["agent_scores"] = {
+            "researcher": round(claim.get("confidence", 0.5), 2),
+            "verifier": round(algo_conf, 2),
+            "source_agreement": round(len(supp) / max(1, len(supp) + len(contra)), 2),
+            "source_reliability": round(sum(get_source_tier(s) for s in supp) / max(1, len(supp)), 2),
         }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Pipeline failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Pipeline processing failed. Please try again.")
+
+    # Step 5: Synthesize
+    report_data, log4 = await synthesizer_agent(topic, verified, flags, api_key)
+    pipeline_log.append(log4)
+    yield {"event": "agent_complete", "data": json.dumps(log4)}
+
+    # Calculate overall confidence from claim-level scores
+    if verified:
+        overall_confidence = round(sum(c.get("confidence", 0.5) for c in verified) / len(verified), 2)
+    else:
+        overall_confidence = 0.5
+
+    total_duration = round(time.time() - pipeline_start, 2)
+
+    report = {
+        "topic": topic,
+        "overall_confidence": overall_confidence,
+        "summary": report_data.get("summary", ""),
+        "confidence_reasoning": report_data.get("confidence_reasoning", ""),
+        "claims": verified,
+        "hallucinations": flags,
+        "pipeline_log": pipeline_log,
+        "total_duration": total_duration,
+    }
+
+    yield {"event": "complete", "data": json.dumps({"status": "success", "report": report})}
+
+
+# --- API Endpoints ---
+
+@app.post("/api/research")
+async def research(request: ResearchRequest):
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured")
+
+    if request.stream:
+        async def event_generator():
+            async for event in run_pipeline(request.topic, api_key):
+                yield f"event: {event['event']}\ndata: {event['data']}\n\n"
+
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
+    # Non-streaming: collect all events and return final result
+    result = None
+    async for event in run_pipeline(request.topic, api_key):
+        if event["event"] == "complete":
+            result = json.loads(event["data"])
+
+    if result:
+        return result
+    raise HTTPException(status_code=500, detail="Pipeline failed")
+
+
+@app.post("/api/batch")
+async def batch_verify(request: BatchRequest):
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured")
+
+    results = []
+    for topic in request.topics:
+        topic = sanitize_input(topic)
+        if len(topic) < 3:
+            results.append({"topic": topic, "status": "error", "error": "Topic too short"})
+            continue
+
+        try:
+            search_results = web_search(topic, max_results=3)
+            claims, _ = await research_agent(topic, api_key, search_results)
+            verified, _ = await verifier_agent(claims, topic, api_key, search_results)
+            flags, _ = await contradiction_agent(verified, topic, api_key)
+
+            for claim in verified:
+                supp = claim.get("supporting_sources", [])
+                contra = claim.get("contradicting_sources", [])
+                algo_conf = calculate_claim_confidence(claim, flags, supp, contra)
+                claim["confidence"] = algo_conf
+
+            report_data, _ = await synthesizer_agent(topic, verified, flags, api_key)
+
+            if verified:
+                overall_confidence = round(sum(c.get("confidence", 0.5) for c in verified) / len(verified), 2)
+            else:
+                overall_confidence = 0.5
+
+            results.append({
+                "topic": topic,
+                "status": "success",
+                "report": {
+                    "topic": topic,
+                    "overall_confidence": overall_confidence,
+                    "summary": report_data.get("summary", ""),
+                    "confidence_reasoning": report_data.get("confidence_reasoning", ""),
+                    "claims": verified,
+                    "hallucinations": flags,
+                    "pipeline_log": [],
+                    "total_duration": 0,
+                },
+            })
+        except Exception as e:
+            logger.error(f"Batch item failed: {e}")
+            results.append({"topic": topic, "status": "error", "error": str(e)})
+
+    return {"status": "success", "results": results}
+
+
+@app.on_event("startup")
+async def startup_check():
+    api_key = os.getenv("GROQ_API_KEY")
+    brave_key = os.getenv("BRAVE_API_KEY")
+    if not api_key:
+        logger.error("GROQ_API_KEY not set — pipeline will fail")
+    else:
+        logger.info("Anthropic API key configured")
+    if brave_key:
+        logger.info("Brave Search API configured (primary search)")
+    else:
+        logger.info("BRAVE_API_KEY not set — using DuckDuckGo for web search (free, no key needed)")
 
 
 @app.get("/api/health")
 async def health():
-    api_key = os.getenv("ANTHROPIC_API_KEY")
+    api_key = os.getenv("GROQ_API_KEY")
+    brave_key = os.getenv("BRAVE_API_KEY")
     return {
         "status": "ok",
         "service": "Quorum",
-        "version": "2.1.0",
+        "version": "2.2.0",
         "api_key_configured": bool(api_key),
+        "search_provider": "brave" if brave_key else "duckduckgo",
         "pipeline_agents": ["researcher", "verifier", "contradiction", "synthesizer"],
     }
 

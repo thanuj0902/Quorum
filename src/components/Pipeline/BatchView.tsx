@@ -1,41 +1,34 @@
 import { useState, useCallback } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, Plus, X, Zap, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react'
+import { ArrowLeft, Plus, X, Zap, CheckCircle2, AlertTriangle, XCircle, Mic, MicOff } from 'lucide-react'
 import Logo from '../ui/Logo'
-import { demoReport } from '../../data/demoData'
+import { useVoiceInput } from '../../hooks/useVoiceInput'
 import type { VerificationReport } from '../../types'
 
 interface BatchViewProps {
   onBack: () => void
   onSaveReport: (report: VerificationReport) => string
+  onRunBatch: (topics: string[]) => Promise<{ topic: string; report: VerificationReport | null; status: string; error?: string }[]>
 }
 
-type BatchClaimStatus = 'pending' | 'running' | 'complete'
+type BatchClaimStatus = 'pending' | 'running' | 'complete' | 'error'
 
 interface BatchClaim {
   topic: string
   status: BatchClaimStatus
   report: VerificationReport | null
+  error?: string
 }
 
-function createMockReport(topic: string): VerificationReport {
-  const base = { ...demoReport, topic }
-  base.overall_confidence = 0.5 + Math.random() * 0.45
-  base.claims = base.claims.slice(0, 3).map((c, i) => ({
-    ...c,
-    confidence: Math.min(1, Math.max(0.3, c.confidence + (Math.random() - 0.5) * 0.3)),
-    verification_status: (['verified', 'partially_verified', 'unverified', 'contradicted'] as const)[i % 3],
-  }))
-  return base
-}
-
-export default function BatchView({ onBack, onSaveReport: _onSaveReport }: BatchViewProps) {
+export default function BatchView({ onBack, onSaveReport: _onSaveReport, onRunBatch }: BatchViewProps) {
   const [inputs, setInputs] = useState<BatchClaim[]>([
     { topic: '', status: 'pending', report: null },
     { topic: '', status: 'pending', report: null },
   ])
   const [isRunning, setIsRunning] = useState(false)
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
+  const { isListening, transcript, isSupported: voiceSupported, startListening, stopListening, resetTranscript } = useVoiceInput()
+  const [voiceTargetIndex, setVoiceTargetIndex] = useState<number | null>(null)
 
   const canAdd = inputs.length < 5
   const canVerify = inputs.some((c) => c.topic.trim()) && !isRunning
@@ -54,27 +47,60 @@ export default function BatchView({ onBack, onSaveReport: _onSaveReport }: Batch
     setInputs((prev) => prev.filter((_, i) => i !== index))
   }, [inputs.length])
 
+  const handleVoiceToggle = useCallback((index: number) => {
+    if (isListening && voiceTargetIndex === index) {
+      stopListening()
+      setVoiceTargetIndex(null)
+    } else {
+      if (isListening) stopListening()
+      setVoiceTargetIndex(index)
+      startListening()
+    }
+  }, [isListening, voiceTargetIndex, startListening, stopListening])
+
+  const handleVoiceConfirm = useCallback(() => {
+    if (transcript && voiceTargetIndex !== null) {
+      updateTopic(voiceTargetIndex, transcript)
+      resetTranscript()
+      stopListening()
+      setVoiceTargetIndex(null)
+    }
+  }, [transcript, voiceTargetIndex, updateTopic, resetTranscript, stopListening])
+
   const handleVerify = useCallback(async () => {
     setIsRunning(true)
     const filled = inputs.map((c, i) => ({ ...c, index: i })).filter((c) => c.topic.trim())
 
-    for (const claim of filled) {
-      setActiveIndex(claim.index)
-      setInputs((prev) =>
-        prev.map((c, i) => (i === claim.index ? { ...c, status: 'running' as const } : c))
-      )
-      await new Promise((r) => setTimeout(r, 1500))
-      const report = createMockReport(claim.topic.trim())
-      setInputs((prev) =>
-        prev.map((c, i) =>
-          i === claim.index ? { ...c, status: 'complete' as const, report } : c
+    // Mark all as running
+    setInputs((prev) =>
+      prev.map((c, i) => {
+        const filledIndex = filled.findIndex(f => f.index === i)
+        return filledIndex >= 0 ? { ...c, status: 'running' as const } : c
+      })
+    )
+
+    setActiveIndex(0)
+
+    const topics = filled.map(c => c.topic.trim())
+    const results = await onRunBatch(topics)
+
+    for (let i = 0; i < filled.length; i++) {
+      const result = results[i]
+      const claimIndex = filled[i].index
+      if (result) {
+        setInputs((prev) =>
+          prev.map((c, idx) =>
+            idx === claimIndex
+              ? { ...c, status: result.status === 'success' ? 'complete' : 'error', report: result.report, error: result.error }
+              : c
+          )
         )
-      )
+      }
     }
 
     setActiveIndex(null)
     setIsRunning(false)
-  }, [inputs])
+  }, [inputs, onRunBatch])
 
   const getStatusCounts = (report: VerificationReport) => {
     const verified = report.claims.filter((c) => c.verification_status === 'verified').length
@@ -134,12 +160,12 @@ export default function BatchView({ onBack, onSaveReport: _onSaveReport }: Batch
                 <div className="flex-1 relative group">
                   <input
                     type="text"
-                    value={claim.topic}
+                    value={isListening && voiceTargetIndex === i ? (transcript || claim.topic) : claim.topic}
                     onChange={(e) => updateTopic(i, e.target.value)}
-                    placeholder={`Claim or topic ${i + 1}...`}
+                    placeholder={isListening && voiceTargetIndex === i ? 'Listening...' : `Claim or topic ${i + 1}...`}
                     disabled={isRunning}
                     maxLength={500}
-                    className="w-full bg-surface border border-border rounded-2xl px-5 py-4 text-sm font-body placeholder:text-text-secondary/30 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-all duration-300 disabled:opacity-50"
+                    className="w-full bg-surface border border-border rounded-2xl px-5 py-4 pr-12 text-sm font-body placeholder:text-text-secondary/30 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-all duration-300 disabled:opacity-50"
                   />
                   {claim.status === 'running' && (
                     <div className="absolute right-4 top-1/2 -translate-y-1/2">
@@ -160,7 +186,35 @@ export default function BatchView({ onBack, onSaveReport: _onSaveReport }: Batch
                       </span>
                     </div>
                   )}
+                  {claim.status === 'error' && (
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-red text-[10px] font-mono">
+                      Error
+                    </div>
+                  )}
                 </div>
+                {voiceSupported && !isRunning && (
+                  <div className="flex items-center gap-1.5">
+                    {isListening && voiceTargetIndex === i && transcript && (
+                      <motion.button
+                        type="button"
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        onClick={handleVoiceConfirm}
+                        className="px-2 py-1.5 bg-green/10 border border-green/20 text-green text-[10px] font-medium rounded-lg hover:bg-green/20 transition-colors"
+                      >
+                        Use
+                      </motion.button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleVoiceToggle(i)}
+                      className={`p-1.5 rounded-lg border transition-all ${isListening && voiceTargetIndex === i ? 'bg-red/10 border-red/30 text-red' : 'bg-surface border-border text-text-secondary hover:text-accent'}`}
+                      aria-label={isListening && voiceTargetIndex === i ? 'Stop voice input' : 'Start voice input'}
+                    >
+                      {isListening && voiceTargetIndex === i ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                    </button>
+                  </div>
+                )}
                 {!isRunning && inputs.length > 2 && (
                   <button
                     onClick={() => removeInput(i)}
@@ -226,10 +280,24 @@ export default function BatchView({ onBack, onSaveReport: _onSaveReport }: Batch
             className="space-y-6"
           >
             <h2 className="text-lg font-display font-semibold text-text">Results</h2>
-            <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(inputs.filter((c) => c.report).length, 3)}, 1fr)` }}>
+            <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(inputs.filter((c) => c.report || c.status === 'error').length, 3)}, 1fr)` }}>
               {inputs
-                .filter((c) => c.status === 'complete' && c.report)
+                .filter((c) => c.status === 'complete' || c.status === 'error')
                 .map((c, i) => {
+                  if (c.status === 'error') {
+                    return (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.1 }}
+                        className="bg-surface border border-red/20 rounded-2xl p-5"
+                      >
+                        <h3 className="text-sm font-semibold text-text truncate mb-2" title={c.topic}>{c.topic}</h3>
+                        <p className="text-xs text-red">{c.error || 'Verification failed'}</p>
+                      </motion.div>
+                    )
+                  }
                   const report = c.report!
                   const conf = report.overall_confidence
                   const counts = getStatusCounts(report)

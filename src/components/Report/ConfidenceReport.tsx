@@ -14,15 +14,17 @@ function AnimatedNumber({ value, duration = 1200 }: AnimatedNumberProps) {
   const [display, setDisplay] = useState<number>(0)
 
   useEffect(() => {
+    let frameId: number
     const startTime = Date.now()
     const tick = () => {
       const elapsed = Date.now() - startTime
       const progress = Math.min(elapsed / duration, 1)
       const eased = 1 - Math.pow(1 - progress, 3)
       setDisplay(Math.round(eased * value))
-      if (progress < 1) requestAnimationFrame(tick)
+      if (progress < 1) frameId = requestAnimationFrame(tick)
     }
-    requestAnimationFrame(tick)
+    frameId = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frameId)
   }, [value, duration])
 
   return <span>{display}</span>
@@ -47,6 +49,17 @@ function ConfidenceReport({ report }: ConfidenceReportProps) {
 
   return (
     <div className="space-y-8">
+      {/* Query echo — always shows what topic this report is about */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center gap-3 px-5 py-3 rounded-2xl border"
+        style={{ background: 'rgba(124,58,237,0.06)', borderColor: 'rgba(124,58,237,0.15)' }}
+      >
+        <span className="text-xs font-mono font-semibold text-accent/70 uppercase tracking-wider shrink-0">Report for:</span>
+        <span className="text-sm font-medium text-text truncate">{report.topic}</span>
+      </motion.div>
+
       {/* Overall confidence — hero card */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -55,6 +68,40 @@ function ConfidenceReport({ report }: ConfidenceReportProps) {
         style={{ background: '#111114' }}
       >
         <div className="absolute inset-0 pointer-events-none" aria-hidden="true" style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.04), transparent 50%, rgba(52,211,153,0.02))' }} />
+
+        {/* Floating accent orbs inside hero card */}
+        <motion.div
+          animate={{ x: [0, 15, -10, 0], y: [0, -12, 8, 0], opacity: [0.08, 0.18, 0.08] }}
+          transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute top-4 right-8 w-32 h-32 rounded-full blur-2xl bg-accent/10"
+          aria-hidden="true"
+        />
+        <motion.div
+          animate={{ x: [0, -10, 12, 0], y: [0, 10, -8, 0], opacity: [0.05, 0.12, 0.05] }}
+          transition={{ duration: 15, delay: 2, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute bottom-4 left-8 w-24 h-24 rounded-full blur-2xl bg-green/8"
+          aria-hidden="true"
+        />
+        {/* Floating ring */}
+        <motion.div
+          animate={{ rotate: [0, 360], opacity: [0.04, 0.1, 0.04] }}
+          transition={{ duration: 30, repeat: Infinity, ease: 'linear' }}
+          className="absolute -top-8 -right-8 w-32 h-32 rounded-full border border-accent/10"
+          aria-hidden="true"
+        />
+        {/* Floating dots */}
+        <motion.div
+          animate={{ y: [0, -6, 0], opacity: [0.15, 0.4, 0.15] }}
+          transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute top-6 left-6 w-1.5 h-1.5 rounded-full bg-accent/30"
+          aria-hidden="true"
+        />
+        <motion.div
+          animate={{ y: [0, -4, 0], opacity: [0.1, 0.3, 0.1] }}
+          transition={{ duration: 7, delay: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute bottom-8 right-16 w-1 h-1 rounded-full bg-green/30"
+          aria-hidden="true"
+        />
 
         <div className="relative">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
@@ -167,11 +214,14 @@ function ConfidenceReport({ report }: ConfidenceReportProps) {
             <span className="text-xs text-text-secondary/50 font-mono px-3 py-1.5 rounded-lg" style={{ background: '#18181D' }}>{claims.length} claims</span>
           </div>
           <div className="space-y-3" role="list" aria-label="Verified claims">
-            {claims.map((claim, i) => (
-              <div key={claim.claim || i} role="listitem">
-                <ClaimCard claim={claim} index={i} />
-              </div>
-            ))}
+            {claims.map((claim, i) => {
+              const flag = hallucinations.find(h => h.claim === claim.claim)
+              return (
+                <div key={claim.claim || i} role="listitem">
+                  <ClaimCard claim={claim} index={i} hallucinationFlag={flag} />
+                </div>
+              )
+            })}
           </div>
         </motion.div>
       )}

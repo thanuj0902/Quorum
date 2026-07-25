@@ -42,7 +42,25 @@ export default function FAQ() {
   const [openIndex, setOpenIndex] = useState<number | null>(null)
 
   return (
-    <section id="faq" className="py-24 px-6" aria-labelledby="faq-heading">
+    <section id="faq" className="py-24 px-6 relative" aria-labelledby="faq-heading">
+      {/* Floating decorative accents */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
+        <motion.div
+          animate={{ y: [0, -10, 0], opacity: [0.04, 0.1, 0.04] }}
+          transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute top-20 right-[10%] w-20 h-20 rounded-full border border-accent/10"
+        />
+        <motion.div
+          animate={{ y: [0, -8, 0], opacity: [0.06, 0.14, 0.06] }}
+          transition={{ duration: 10, delay: 2, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute bottom-16 left-[8%] w-14 h-14 rounded-full border border-green/10"
+        />
+        <motion.div
+          animate={{ y: [0, -5, 0], opacity: [0.1, 0.25, 0.1] }}
+          transition={{ duration: 6, delay: 1, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute top-1/2 left-[5%] w-1.5 h-1.5 rounded-full bg-accent/20"
+        />
+      </div>
       <div className="max-w-3xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}

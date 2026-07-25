@@ -1,6 +1,7 @@
 import { memo, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Database, TrendingUp, TrendingDown, Shield } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import type { VerificationReport } from '../../types'
 
 interface SourceEntry {
@@ -8,6 +9,7 @@ interface SourceEntry {
   cited: number
   supported: number
   contradicted: number
+  trust: number
 }
 
 interface SourceTrustLedgerProps {
@@ -18,7 +20,7 @@ function SourceTrustLedger({ report }: SourceTrustLedgerProps) {
   const sources = useMemo((): SourceEntry[] => {
     if (!report?.claims?.length) return []
 
-    const sourceMap: Record<string, SourceEntry> = {}
+    const sourceMap: Record<string, { name: string; cited: number; supported: number; contradicted: number }> = {}
 
     report.claims.forEach(claim => {
       if (!sourceMap[claim.source]) {
@@ -38,13 +40,30 @@ function SourceTrustLedger({ report }: SourceTrustLedgerProps) {
     })
 
     return Object.values(sourceMap)
-      .sort((a, b) => (b.supported - b.contradicted) - (a.supported - a.contradicted))
+      .map(s => ({
+        ...s,
+        trust: Math.round((s.supported / (s.supported + s.contradicted || 1)) * 100),
+      }))
+      .sort((a, b) => b.trust - a.trust)
       .slice(0, 10)
   }, [report])
 
   if (sources.length === 0) return null
 
-  const topTrust = sources.length > 0 ? Math.round((sources[0].supported / (sources[0].supported + sources[0].contradicted || 1)) * 100) : 0
+  const topTrust = sources[0]?.trust || 0
+
+  const chartData = sources.map(s => ({
+    name: s.name.length > 20 ? s.name.slice(0, 18) + '...' : s.name,
+    trust: s.trust,
+    supported: s.supported,
+    contradicted: s.contradicted,
+  }))
+
+  const getBarColor = (trust: number) => {
+    if (trust >= 70) return '#34D399'
+    if (trust >= 40) return '#FBBF24'
+    return '#F87171'
+  }
 
   return (
     <motion.div
@@ -70,11 +89,52 @@ function SourceTrustLedger({ report }: SourceTrustLedgerProps) {
         </div>
       </div>
 
+      {/* Recharts bar chart */}
+      <div className="mb-6 h-[200px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 40 }}>
+            <XAxis
+              dataKey="name"
+              tick={{ fill: '#7A7A95', fontSize: 10, fontFamily: 'JetBrains Mono, monospace' }}
+              angle={-35}
+              textAnchor="end"
+              height={60}
+              axisLine={{ stroke: '#222230' }}
+              tickLine={false}
+            />
+            <YAxis
+              tick={{ fill: '#7A7A95', fontSize: 10, fontFamily: 'JetBrains Mono, monospace' }}
+              domain={[0, 100]}
+              axisLine={false}
+              tickLine={false}
+              width={35}
+            />
+            <Tooltip
+              contentStyle={{
+                background: '#18181D',
+                border: '1px solid #222230',
+                borderRadius: '12px',
+                fontSize: '12px',
+                fontFamily: 'Inter, sans-serif',
+                color: '#F0F0F5',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+              }}
+              formatter={(value) => [`${value}%`, 'Trust Score']}
+              labelStyle={{ color: '#A78BFA', fontWeight: 600 }}
+            />
+            <Bar dataKey="trust" radius={[6, 6, 0, 0]} maxBarSize={40}>
+              {chartData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={getBarColor(entry.trust)} fillOpacity={0.85} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Source list with trust bars */}
       <ul className="space-y-2" role="list" aria-label="Source reliability scores">
         {sources.map((src, i) => {
-          const total = src.supported + src.contradicted || 1
-          const trust = Math.round((src.supported / total) * 100)
-          const trustColor = trust >= 70 ? '#34D399' : trust >= 40 ? '#FBBF24' : '#F87171'
+          const trustColor = src.trust >= 70 ? '#34D399' : src.trust >= 40 ? '#FBBF24' : '#F87171'
 
           return (
             <motion.li
@@ -85,7 +145,6 @@ function SourceTrustLedger({ report }: SourceTrustLedgerProps) {
               className="flex items-center gap-4 p-3.5 rounded-xl border transition-colors"
               style={{ background: '#18181D', borderColor: '#222230' }}
             >
-              {/* Rank badge */}
               <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: i === 0 ? 'rgba(52,211,153,0.1)' : '#1F1F26', border: `1px solid ${i === 0 ? 'rgba(52,211,153,0.2)' : '#222230'}` }}>
                 <span className="text-[11px] font-mono font-bold" style={{ color: i === 0 ? '#34D399' : '#555' }}>
                   {i + 1}
@@ -105,11 +164,10 @@ function SourceTrustLedger({ report }: SourceTrustLedgerProps) {
                     <TrendingDown className="w-2.5 h-2.5" aria-hidden="true" /> {src.contradicted}
                   </span>
                 </div>
-                {/* Trust bar */}
                 <div className="w-full h-1 rounded-full overflow-hidden mt-2.5" style={{ background: '#1F1F26' }}>
                   <motion.div
                     initial={{ width: 0 }}
-                    animate={{ width: `${trust}%` }}
+                    animate={{ width: `${src.trust}%` }}
                     transition={{ duration: 0.8, delay: 0.1 * i }}
                     className="h-full rounded-full"
                     style={{ background: trustColor }}
@@ -119,7 +177,7 @@ function SourceTrustLedger({ report }: SourceTrustLedgerProps) {
 
               <div className="text-right shrink-0">
                 <div className="text-sm font-mono font-bold" style={{ color: trustColor }}>
-                  {trust}%
+                  {src.trust}%
                 </div>
                 <div className="text-[10px] text-text-secondary/40 mt-0.5">trust</div>
               </div>

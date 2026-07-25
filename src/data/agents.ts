@@ -36,14 +36,3 @@ export const AGENTS: Agent[] = [
 export const AGENT_MAP: Record<AgentId, Agent> = Object.fromEntries(
   AGENTS.map(a => [a.id, a])
 ) as Record<AgentId, Agent>
-
-export const PIPELINE_TIMING = {
-  INIT_DELAY: 800,
-  AGENT_MESSAGE_MIN: 600,
-  AGENT_MESSAGE_MAX: 1000,
-  AGENT_COMPLETE_DELAY: 300,
-  LIVE_AGENT_MIN: 1200,
-  LIVE_AGENT_MAX: 2200,
-  FALLBACK_DELAY: 800,
-
-} as const

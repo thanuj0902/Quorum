@@ -1,65 +1,164 @@
+import jsPDF from 'jspdf'
 import type { VerificationReport } from '../types'
 
 export function exportReportAsPDF(report: VerificationReport): void {
-  const pct = Math.round((report.overall_confidence || 0) * 100)
-  const claims = report.claims || []
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const margin = 20
+  const contentWidth = pageWidth - margin * 2
+  let y = margin
 
+  const addText = (text: string, fontSize: number, isBold = false, color: [number, number, number] = [31, 41, 55]) => {
+    doc.setFontSize(fontSize)
+    doc.setFont('helvetica', isBold ? 'bold' : 'normal')
+    doc.setTextColor(...color)
+
+    const lines = doc.splitTextToSize(text, contentWidth)
+    for (const line of lines) {
+      if (y > 270) {
+        doc.addPage()
+        y = margin
+      }
+      doc.text(line, margin, y)
+      y += fontSize * 0.5
+    }
+    y += 2
+  }
+
+  const addDivider = () => {
+    if (y > 270) {
+      doc.addPage()
+      y = margin
+    }
+    doc.setDrawColor(200)
+    doc.setLineWidth(0.2)
+    doc.line(margin, y, pageWidth - margin, y)
+    y += 5
+  }
+
+  // Title
+  addText('Quorum Verification Report', 20, true, [124, 58, 237])
+  y += 2
+
+  // Topic
+  addText(report.topic, 14, true)
+  y += 2
+
+  // Date
+  addText(
+    `Generated ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`,
+    10,
+    false,
+    [122, 122, 149]
+  )
+  y += 3
+
+  addDivider()
+
+  // Overall confidence
+  const pct = Math.round((report.overall_confidence || 0) * 100)
+  addText(`Overall Confidence: ${pct}%`, 24, true, pct >= 70 ? [52, 211, 153] : pct >= 40 ? [251, 191, 36] : [248, 113, 113])
+  y += 3
+
+  // Summary
+  if (report.summary) {
+    addText(report.summary, 10, false, [55, 65, 81])
+    y += 3
+  }
+
+  addDivider()
+
+  // Stats
+  const claims = report.claims || []
   const verified = claims.filter(c => c.verification_status === 'verified').length
   const partial = claims.filter(c => c.verification_status === 'partially_verified').length
   const flagged = claims.filter(c => c.verification_status === 'unverified' || c.verification_status === 'contradicted').length
 
-  const claimRows = claims.map(c => {
+  addText(`Verified: ${verified}  |  Partial: ${partial}  |  Flagged: ${flagged}`, 10, true)
+  y += 5
+
+  addDivider()
+
+  // Claims
+  addText('Claims', 14, true, [124, 58, 237])
+  y += 3
+
+  for (let i = 0; i < claims.length; i++) {
+    const c = claims[i]
     const conf = Math.round((c.confidence || 0) * 100)
-    return `
-      <div style="border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:12px">
-        <p style="font-weight:600;margin:0 0 8px 0">${c.claim}</p>
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-          <span style="font-size:12px;padding:2px 8px;border-radius:4px;background:#f3f4f6">${conf}%</span>
-          <span style="font-size:12px;padding:2px 8px;border-radius:4px;background:#f3f4f6;text-transform:capitalize">${c.verification_status.replace('_', ' ')}</span>
-        </div>
-        <p style="font-size:12px;color:#6b7280;margin:0"><strong>Source:</strong> ${c.source}</p>
-        ${c.reasoning ? `<p style="font-size:12px;color:#6b7280;margin:8px 0 0 0"><strong>Reasoning:</strong> ${c.reasoning}</p>` : ''}
-      </div>`
-  }).join('\n')
 
-  const html = `<!DOCTYPE html>
-<html><head>
-  <meta charset="utf-8"/>
-  <title>FactCheck Report — ${report.topic}</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1f2937; padding: 40px; max-width: 800px; margin: 0 auto; }
-    h1 { font-size: 24px; margin-bottom: 8px; }
-    .meta { font-size: 14px; color: #6b7280; margin-bottom: 24px; }
-    .score { font-size: 48px; font-weight: bold; margin-bottom: 8px; }
-    .summary { font-size: 14px; line-height: 1.6; margin-bottom: 24px; color: #374151; }
-    .claims-header { font-size: 18px; font-weight: 600; margin: 24px 0 12px; }
-    .stats { display: flex; gap: 16px; margin-bottom: 24px; }
-    .stat { padding: 8px 16px; border-radius: 8px; background: #f9fafb; border: 1px solid #e5e7eb; font-size: 13px; }
-    @media print { body { padding: 20px; } }
-  </style>
-</head><body>
-  <h1>${report.topic}</h1>
-  <p class="meta">Generated ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-  <div class="score">${pct}%</div>
-  <p style="font-size:13px;color:#6b7280;margin-bottom:16px">Overall Confidence</p>
-  <div class="stats">
-    <div class="stat"><strong>${verified}</strong> Verified</div>
-    <div class="stat"><strong>${partial}</strong> Partial</div>
-    <div class="stat"><strong>${flagged}</strong> Flagged</div>
-  </div>
-  <p class="summary">${report.summary}</p>
-  <div class="claims-header">Claims (${claims.length})</div>
-  ${claimRows}
-</body></html>`
+    if (y > 240) {
+      doc.addPage()
+      y = margin
+    }
 
-  const blob = new Blob([html], { type: 'text/html' })
-  const url = URL.createObjectURL(blob)
-  const win = window.open(url, '_blank')
-  if (win) {
-    win.onload = () => {
-      win.print()
-      URL.revokeObjectURL(url)
+    // Claim number and text
+    addText(`${i + 1}. ${c.claim}`, 10, true)
+    y += 1
+
+    // Status and confidence
+    const statusColor: [number, number, number] =
+      c.verification_status === 'verified' ? [52, 211, 153] :
+      c.verification_status === 'partially_verified' ? [251, 191, 36] :
+      [248, 113, 113]
+
+    addText(
+      `Confidence: ${conf}%  |  Status: ${c.verification_status.replace('_', ' ')}`,
+      9,
+      false,
+      statusColor
+    )
+
+    // Source
+    if (c.source) {
+      addText(`Source: ${c.source}`, 8, false, [122, 122, 149])
+    }
+
+    // Supporting/contradicting sources
+    if (c.supporting_sources?.length) {
+      addText(`Supporting: ${c.supporting_sources.join(', ')}`, 8, false, [52, 211, 153])
+    }
+    if (c.contradicting_sources?.length) {
+      addText(`Contradicting: ${c.contradicting_sources.join(', ')}`, 8, false, [248, 113, 113])
+    }
+
+    // Reasoning
+    if (c.reasoning) {
+      addText(`Reasoning: ${c.reasoning}`, 8, false, [122, 122, 149])
+    }
+
+    y += 4
+  }
+
+  // Hallucination flags
+  const flags = report.hallucinations?.filter(h => h.flag_type && h.flag_type !== 'none') || []
+  if (flags.length > 0) {
+    addDivider()
+    addText('Contradiction & Hallucination Flags', 14, true, [248, 113, 113])
+    y += 3
+
+    for (const flag of flags) {
+      if (y > 250) {
+        doc.addPage()
+        y = margin
+      }
+
+      const typeLabel = flag.flag_type === 'direct_contradiction' ? 'Direct Contradiction' : 'Unsubstantiated Claim'
+      addText(`[${typeLabel}] ${flag.claim}`, 9, true, flag.flag_type === 'direct_contradiction' ? [251, 191, 36] : [248, 113, 113])
+      addText(`Severity: ${flag.severity} — ${flag.reason}`, 8, false, [122, 122, 149])
+      y += 3
     }
   }
+
+  // Footer
+  const totalPages = doc.getNumberOfPages()
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i)
+    doc.setFontSize(8)
+    doc.setTextColor(150)
+    doc.text(`Quorum — Multi-Agent Fact-Verification`, margin, 290)
+    doc.text(`Page ${i}/${totalPages}`, pageWidth - margin - 20, 290)
+  }
+
+  doc.save(`quorum-report-${report.topic.slice(0, 50).replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}.pdf`)
 }

@@ -61,9 +61,24 @@ export default function UseCases() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: i * 0.1 }}
-              className="group relative p-6 bg-surface border border-border rounded-2xl hover:border-accent/20 transition-all duration-500"
+              className="group relative p-6 bg-surface border border-border rounded-2xl hover:border-accent/20 transition-all duration-500 overflow-hidden"
             >
               <div className="absolute inset-0 bg-gradient-to-b from-accent/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl" aria-hidden="true" />
+
+              {/* Floating decorative ring */}
+              <motion.div
+                animate={{ rotate: [0, 360], opacity: [0.04, 0.1, 0.04] }}
+                transition={{ duration: 25, repeat: Infinity, ease: 'linear' }}
+                className="absolute -top-6 -right-6 w-24 h-24 rounded-full border border-accent/10"
+                aria-hidden="true"
+              />
+              {/* Floating dot */}
+              <motion.div
+                animate={{ y: [0, -5, 0], opacity: [0.15, 0.35, 0.15] }}
+                transition={{ duration: 6, delay: i * 1, repeat: Infinity, ease: 'easeInOut' }}
+                className="absolute bottom-4 right-4 w-1.5 h-1.5 rounded-full bg-accent/25"
+                aria-hidden="true"
+              />
 
               <div className="relative">
                 <div className="flex items-center gap-3 mb-4">

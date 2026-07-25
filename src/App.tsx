@@ -9,6 +9,7 @@ import type { AppView } from './types'
 
 const LandingView = lazy(() => import('./components/Landing/LandingView'))
 const PipelineView = lazy(() => import('./components/Pipeline/PipelineView'))
+const BatchView = lazy(() => import('./components/Pipeline/BatchView'))
 const HistoryView = lazy(() => import('./components/History/HistoryView'))
 const ReportView = lazy(() => import('./components/History/ReportView'))
 
@@ -28,7 +29,7 @@ export default function App() {
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
   const [linkCopied, setLinkCopied] = useState(false)
 
-  const { phase, pipelineState, report, error, runDemoPipeline, runLivePipeline } = usePipeline()
+  const { phase, pipelineState, report, error, runLivePipeline, runBatchPipeline } = usePipeline()
   const { history, stats, saveReport, deleteEntry, getEntry } = useHistory()
   const { toasts, addToast, removeToast } = useToast()
 
@@ -49,8 +50,7 @@ export default function App() {
   const handleStart = useCallback(() => {
     setView('pipeline')
     window.scrollTo({ top: 0, behavior: 'smooth' })
-    setTimeout(() => runDemoPipeline(), 500)
-  }, [runDemoPipeline])
+  }, [])
 
   const handleBack = useCallback(() => {
     setView('landing')
@@ -59,10 +59,14 @@ export default function App() {
 
   const handleCopyLink = useCallback(async () => {
     if (!selectedReportId) return
-    await navigator.clipboard.writeText(`${window.location.origin}#${selectedReportId}`)
-    setLinkCopied(true)
-    addToast('Share link copied to clipboard', 'success')
-    setTimeout(() => setLinkCopied(false), 2000)
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}#${selectedReportId}`)
+      setLinkCopied(true)
+      addToast('Share link copied to clipboard', 'success')
+      setTimeout(() => setLinkCopied(false), 2000)
+    } catch {
+      addToast('Failed to copy link', 'error')
+    }
   }, [selectedReportId, addToast])
 
   const handleHistoryBack = useCallback(() => {
@@ -116,6 +120,27 @@ export default function App() {
                     }
                   }}
                   onViewHistory={() => setView('history')}
+                  onOpenBatch={() => setView('batch')}
+                />
+              </motion.div>
+            )}
+
+            {view === 'batch' && (
+              <motion.div
+                key="batch"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <BatchView
+                  onBack={() => setView('landing')}
+                  onSaveReport={(report) => {
+                    const id = saveReport(report)
+                    addToast('Report saved to history', 'success')
+                    return id
+                  }}
+                  onRunBatch={runBatchPipeline}
                 />
               </motion.div>
             )}
@@ -155,6 +180,27 @@ export default function App() {
                   onCopyLink={handleCopyLink}
                   linkCopied={linkCopied}
                 />
+              </motion.div>
+            )}
+
+            {view === 'report' && !selectedEntry && (
+              <motion.div
+                key="report-not-found"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="min-h-screen flex items-center justify-center bg-base"
+              >
+                <div className="text-center space-y-4">
+                  <p className="text-text-secondary text-sm">Report not found or may have been deleted.</p>
+                  <button
+                    onClick={() => { setView('landing'); window.location.hash = '' }}
+                    className="px-5 py-2.5 bg-accent text-white text-sm font-medium rounded-xl hover:bg-accent/90 transition-colors"
+                  >
+                    Back to Home
+                  </button>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>

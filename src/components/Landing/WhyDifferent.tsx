@@ -67,6 +67,22 @@ export default function WhyDifferent() {
             >
               <div className="absolute inset-0 bg-gradient-to-b from-accent/[0.04] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" aria-hidden="true" />
 
+              {/* Floating accent dot */}
+              <motion.div
+                animate={{ y: [0, -6, 0], opacity: [0.15, 0.35, 0.15] }}
+                transition={{ duration: 5, delay: i * 1.2, repeat: Infinity, ease: 'easeInOut' }}
+                className="absolute top-4 right-4 w-2 h-2 rounded-full bg-accent/25"
+                aria-hidden="true"
+              />
+
+              {/* Floating corner ring */}
+              <motion.div
+                animate={{ rotate: [0, 360], opacity: [0.06, 0.12, 0.06] }}
+                transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
+                className="absolute -bottom-4 -left-4 w-16 h-16 rounded-full border border-accent/10"
+                aria-hidden="true"
+              />
+
               <div className="relative">
                 <div className="flex items-start justify-between mb-4">
                   <div className="w-10 h-10 rounded-xl bg-accent-dim border border-accent/15 flex items-center justify-center group-hover:border-accent/30 group-hover:scale-110 transition-all duration-300" aria-hidden="true">

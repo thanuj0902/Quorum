@@ -1,12 +1,13 @@
 import React, { memo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronDown, CheckCircle2, AlertTriangle, XCircle, ExternalLink } from 'lucide-react'
+import { ChevronDown, CheckCircle2, AlertTriangle, XCircle, ExternalLink, ShieldAlert, HelpCircle } from 'lucide-react'
 import { confidenceClasses } from '../../utils/colors'
-import type { Claim } from '../../types'
+import type { Claim, HallucinationFlag } from '../../types'
 
 interface ClaimCardProps {
   claim: Claim
   index: number
+  hallucinationFlag?: HallucinationFlag
 }
 
 function statusIcon(status: Claim['verification_status']): React.ReactNode {
@@ -27,7 +28,7 @@ function statusLabel(status: Claim['verification_status']): { text: string; colo
   }
 }
 
-function ClaimCard({ claim, index }: ClaimCardProps) {
+function ClaimCard({ claim, index, hallucinationFlag }: ClaimCardProps) {
   const [expanded, setExpanded] = useState<boolean>(false)
   if (!claim) return null
 
@@ -118,6 +119,39 @@ function ClaimCard({ claim, index }: ClaimCardProps) {
                       <span className="font-mono text-xs font-bold text-accent">{Math.round(score * 100)}%</span>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* Contradiction / Hallucination Flag */}
+              {hallucinationFlag && hallucinationFlag.flag_type !== 'none' && (
+                <div className={`p-4 rounded-xl border ${hallucinationFlag.flag_type === 'direct_contradiction' ? 'border-yellow/20' : 'border-red/20'}`}
+                  style={{ background: hallucinationFlag.flag_type === 'direct_contradiction' ? 'rgba(251,191,36,0.04)' : 'rgba(248,113,113,0.04)' }}>
+                  <div className="flex items-center gap-2 mb-2">
+                    {hallucinationFlag.flag_type === 'direct_contradiction' ? (
+                      <ShieldAlert className="w-3.5 h-3.5 text-yellow" />
+                    ) : (
+                      <HelpCircle className="w-3.5 h-3.5 text-red" />
+                    )}
+                    <p className={`text-[11px] font-semibold uppercase tracking-wider ${hallucinationFlag.flag_type === 'direct_contradiction' ? 'text-yellow' : 'text-red'}`}>
+                      {hallucinationFlag.flag_type === 'direct_contradiction' ? 'Direct Contradiction' : 'Unsubstantiated Claim'}
+                    </p>
+                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${hallucinationFlag.severity === 'none' ? 'bg-surface-3 text-text-secondary' : hallucinationFlag.severity === 'low' ? 'bg-yellow/10 text-yellow' : 'bg-red/10 text-red'}`}>
+                      {hallucinationFlag.severity}
+                    </span>
+                  </div>
+                  <p className="text-sm text-text-secondary leading-relaxed">{hallucinationFlag.reason}</p>
+                  {hallucinationFlag.contradicting_sources && hallucinationFlag.contradicting_sources.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-[10px] text-text-secondary/50 mb-1">Contradicting sources:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {hallucinationFlag.contradicting_sources.map((src, si) => (
+                          <span key={si} className="text-[10px] font-mono px-2 py-0.5 rounded bg-red/5 text-red/80 border border-red/10">
+                            {src}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -32,7 +32,8 @@ Topic Input
 | **Frontend** | React 19, TypeScript, Vite 8, Tailwind CSS v4 |
 | **Animations** | Framer Motion |
 | **Icons** | Lucide React |
-| **Backend** | Python 3, FastAPI, Anthropic Claude API |
+| **Backend** | Python 3, FastAPI, Groq (Llama 3.1 70B) |
+| **Web Search** | DuckDuckGo (free, no key) + Brave Search (optional) |
 | **Deploy** | Vercel (frontend) + Render (backend) |
 
 ## Features
@@ -82,12 +83,12 @@ npm run dev
 # Click "Watch it verify a claim" → auto-runs demo pipeline
 ```
 
-### Full Mode (with Anthropic API)
+### Full Mode (with Groq API — free)
 ```bash
 # Backend
 cd backend
 pip install -r requirements.txt
-echo "ANTHROPIC_API_KEY=sk-ant-..." > .env
+echo "GROQ_API_KEY=gsk-..." > .env
 python main.py
 
 # Frontend (separate terminal)
@@ -138,8 +139,8 @@ Quorum/
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `ANTHROPIC_API_KEY` | No | Enables live verification mode |
-| `ALLOWED_ORIGINS` | No | CORS origins (defaults include Vercel domain) |
+| `GROQ_API_KEY` | Yes | Free API key from console.groq.com (Llama 3.1 70B) |
+| `BRAVE_API_KEY` | No | Optional Brave Search key (better search quality, free tier: 2000/month) |
 
 ## License
 

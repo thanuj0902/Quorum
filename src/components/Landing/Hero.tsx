@@ -75,6 +75,57 @@ export default function Hero({ onStart }: HeroProps) {
         ))}
       </div>
 
+      {/* Floating geometric shapes */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
+        {/* Diamond */}
+        <motion.div
+          animate={{ y: [0, -18, 0], rotate: [45, 50, 45], opacity: [0.15, 0.3, 0.15] }}
+          transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute top-[20%] right-[18%] w-5 h-5 border border-accent/30 rotate-45"
+        />
+        {/* Small ring */}
+        <motion.div
+          animate={{ y: [0, -12, 0], scale: [1, 1.15, 1], opacity: [0.1, 0.25, 0.1] }}
+          transition={{ duration: 9, delay: 1, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute top-[35%] left-[8%] w-8 h-8 rounded-full border border-green/20"
+        />
+        {/* Tiny filled circle */}
+        <motion.div
+          animate={{ y: [0, -20, 0], x: [0, 5, 0], opacity: [0.2, 0.5, 0.2] }}
+          transition={{ duration: 6, delay: 2, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute bottom-[30%] right-[12%] w-2 h-2 rounded-full bg-accent/40"
+        />
+        {/* Plus sign */}
+        <motion.div
+          animate={{ y: [0, -10, 0], rotate: [0, 90, 0], opacity: [0.1, 0.2, 0.1] }}
+          transition={{ duration: 11, delay: 0.5, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute top-[60%] left-[22%] text-accent/20 text-lg font-mono"
+        >
+          +
+        </motion.div>
+        {/* Triangle */}
+        <motion.div
+          animate={{ y: [0, -14, 0], rotate: [0, 15, 0], opacity: [0.08, 0.18, 0.08] }}
+          transition={{ duration: 8, delay: 3, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute top-[15%] left-[45%] w-0 h-0 border-l-[6px] border-r-[6px] border-b-[10px] border-l-transparent border-r-transparent border-b-accent/20"
+        />
+        {/* Small dot cluster */}
+        {[...Array(3)].map((_, i) => (
+          <motion.div
+            key={`dot-cluster-${i}`}
+            animate={{ y: [0, -8 - i * 3, 0], opacity: [0.15, 0.35, 0.15] }}
+            transition={{ duration: 5 + i, delay: i * 0.7, repeat: Infinity, ease: 'easeInOut' }}
+            className="absolute rounded-full bg-green/25"
+            style={{
+              width: 3 + i,
+              height: 3 + i,
+              bottom: `${20 + i * 8}%`,
+              left: `${70 + i * 4}%`,
+            }}
+          />
+        ))}
+      </div>
+
       {/* Grid overlay */}
       <div
         className="absolute inset-0 pointer-events-none opacity-[0.02]"

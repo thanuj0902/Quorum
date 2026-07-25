@@ -11,6 +11,7 @@ export interface Agent {
 export interface Claim {
   claim: string
   source: string
+  source_url?: string
   confidence: number
   verification_status: 'verified' | 'partially_verified' | 'unverified' | 'contradicted'
   supporting_sources: string[]
@@ -19,11 +20,15 @@ export interface Claim {
   agent_scores?: Partial<Record<AgentId, number>>
 }
 
+export type FlagType = 'none' | 'direct_contradiction' | 'unsubstantiated'
+
 export interface HallucinationFlag {
   claim: string
+  flag_type: FlagType
   is_hallucination: boolean
   reason: string
   severity: 'none' | 'low' | 'medium' | 'high' | 'critical'
+  contradicting_sources?: string[]
   evidence_gaps?: string
 }
 
@@ -63,7 +68,7 @@ export interface ConfidenceClasses {
 }
 
 // Routing
-export type AppView = 'landing' | 'pipeline' | 'history' | 'report'
+export type AppView = 'landing' | 'pipeline' | 'batch' | 'history' | 'report'
 
 // History
 export interface HistoryEntry {
