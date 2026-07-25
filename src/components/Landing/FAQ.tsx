@@ -18,7 +18,7 @@ const faqs: FAQItem[] = [
   },
   {
     q: 'Is Quorum free to use?',
-    a: 'Yes, Quorum is completely free to use. It offers a demo mode that works without any API key using simulated data, and a live mode that connects to your own Anthropic API key for real AI-powered multi-agent verification.',
+    a: 'Yes, Quorum is completely free to use. It uses Groq (Llama 3.1 70B) for AI verification — no paid API key needed. Web search is powered by DuckDuckGo, also free.',
   },
   {
     q: 'Can I share fact-check reports with others?',

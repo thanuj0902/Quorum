@@ -55,7 +55,7 @@ function LandingFooter() {
               <a href="/privacy.html" className="text-text-secondary/30 text-xs hover:text-text-secondary/60 transition-colors">Privacy Policy</a>
               <a href="/terms.html" className="text-text-secondary/30 text-xs hover:text-text-secondary/60 transition-colors">Terms of Service</a>
               <span className="text-text-secondary/30 text-xs">
-                Built with TypeScript, React, FastAPI, and Anthropic Claude
+                Built with TypeScript, React, FastAPI, and Groq (Llama 3.1)
               </span>
             </div>
           </div>

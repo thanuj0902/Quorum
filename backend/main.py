@@ -565,7 +565,7 @@ async def run_pipeline(topic: str, api_key: str):
     pipeline_start = time.time()
 
     # Step 0: Web search
-    search_results = web_search(topic, max_results=5)
+    search_results = await web_search(topic, max_results=5)
 
     # Step 1: Research
     claims, log1 = await research_agent(topic, api_key, search_results)
@@ -670,7 +670,7 @@ async def batch_verify(request: BatchRequest):
             continue
 
         try:
-            search_results = web_search(topic, max_results=3)
+            search_results = await web_search(topic, max_results=3)
             claims, _ = await research_agent(topic, api_key, search_results)
             verified, _ = await verifier_agent(claims, topic, api_key, search_results)
             flags, _ = await contradiction_agent(verified, topic, api_key)
