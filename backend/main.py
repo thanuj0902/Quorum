@@ -614,14 +614,14 @@ async def run_pipeline(topic: str, api_key: str):
 
     # Step 2: Verify
     logger.info("[Pipeline] Starting verifier agent")
-    await asyncio.sleep(2)
+    await asyncio.sleep(10)
     verified, log2 = await verifier_agent(claims, topic, api_key, search_results)
     pipeline_log.append(log2)
     yield {"event": "agent_complete", "data": json.dumps(log2)}
 
     # Step 3: Contradiction detection
     logger.info("[Pipeline] Starting contradiction agent")
-    await asyncio.sleep(2)
+    await asyncio.sleep(10)
     flags, log3 = await contradiction_agent(verified, topic, api_key)
     pipeline_log.append(log3)
     yield {"event": "agent_complete", "data": json.dumps(log3)}
@@ -640,7 +640,7 @@ async def run_pipeline(topic: str, api_key: str):
         }
 
     # Step 5: Synthesize
-    await asyncio.sleep(2)
+    await asyncio.sleep(10)
     report_data, log4 = await synthesizer_agent(topic, verified, flags, api_key)
     pipeline_log.append(log4)
     yield {"event": "agent_complete", "data": json.dumps(log4)}
