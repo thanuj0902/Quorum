@@ -76,81 +76,44 @@ export function usePipeline(): UsePipelineReturn {
     updateState({ currentLog: 'Connecting to multi-agent backend...' })
 
     try {
-      // Try SSE streaming first
-      const streamRes = await fetch('/api/research', {
+      const res = await fetch('/api/research', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, stream: true }),
+        body: JSON.stringify({ topic, stream: false }),
       })
 
-      if (streamRes.ok && streamRes.headers.get('content-type')?.includes('text/event-stream')) {
-        const reader = streamRes.body?.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
-
-        if (reader) {
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-
-            buffer += decoder.decode(value, { stream: true })
-            const lines = buffer.split('\n')
-            buffer = lines.pop() || ''
-
-            let eventType = ''
-            for (const line of lines) {
-              if (line.startsWith('event: ')) {
-                eventType = line.slice(7).trim()
-              } else if (line.startsWith('data: ')) {
-                const data = line.slice(6)
-                try {
-                  const parsed = JSON.parse(data)
-
-                  if (eventType === 'agent_complete') {
-                    activateAgentsSequentially([parsed])
-                  } else if (eventType === 'complete') {
-                    updateState({ activeAgent: null, currentLog: 'Pipeline complete — report generated' })
-                    setReport(parsed.report)
-                    setPhase('complete')
-                    return
-                  }
-                } catch { /* skip malformed */ }
-              }
-            }
-          }
-        }
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}))
+        throw new Error(errBody.detail || `HTTP ${res.status}`)
       }
 
-      // Fallback: non-streaming POST
-      if (streamRes.ok && !streamRes.headers.get('content-type')?.includes('text/event-stream')) {
-        const data = await streamRes.json()
-        if (data.report) {
-          // Animate through the agents using real timings
-          const timings = data.report.pipeline_log || []
-          for (let i = 0; i < AGENT_IDS.length; i++) {
-            const agentId = AGENT_IDS[i]
-            const agent = AGENT_MAP[agentId]
-            setPipelineState(prev => ({
-              ...prev,
-              activeAgent: agentId,
-              currentLog: `$ ${agent.label} agent — ${agent.description}`,
-              agentMessages: { ...prev.agentMessages, [agentId]: timings[i]?.message || 'Processing...' },
-            }))
-            await delay(1200 + Math.random() * 1000)
-            const elapsed = timings[i]?.duration?.toFixed(1) || '1.0'
-            setPipelineState(prev => ({
-              ...prev,
-              completedAgents: [...AGENT_IDS.slice(0, i + 1)],
-              agentTimers: { ...prev.agentTimers, [agentId]: elapsed },
-              agentMessages: { ...prev.agentMessages, [agentId]: '' },
-              currentLog: `${agent.label} complete in ${elapsed}s — ${timings[i]?.message || ''}`,
-            }))
-          }
-          updateState({ activeAgent: null, currentLog: 'Pipeline complete — report generated' })
-          setReport(data.report)
-          setPhase('complete')
-          return
+      const data = await res.json()
+
+      if (data.report) {
+        const timings = data.report.pipeline_log || []
+        for (let i = 0; i < AGENT_IDS.length; i++) {
+          const agentId = AGENT_IDS[i]
+          const agent = AGENT_MAP[agentId]
+          setPipelineState(prev => ({
+            ...prev,
+            activeAgent: agentId,
+            currentLog: `$ ${agent.label} agent — ${agent.description}`,
+            agentMessages: { ...prev.agentMessages, [agentId]: timings[i]?.message || 'Processing...' },
+          }))
+          await delay(1200 + Math.random() * 1000)
+          const elapsed = timings[i]?.duration?.toFixed(1) || '1.0'
+          setPipelineState(prev => ({
+            ...prev,
+            completedAgents: [...AGENT_IDS.slice(0, i + 1)],
+            agentTimers: { ...prev.agentTimers, [agentId]: elapsed },
+            agentMessages: { ...prev.agentMessages, [agentId]: '' },
+            currentLog: `${agent.label} complete in ${elapsed}s — ${timings[i]?.message || ''}`,
+          }))
         }
+        updateState({ activeAgent: null, currentLog: 'Pipeline complete — report generated' })
+        setReport(data.report)
+        setPhase('complete')
+        return
       }
 
       throw new Error('Invalid response from backend')
