@@ -1,8 +1,6 @@
-# FactCheck AI — Multi-Agent Research & Fact-Verification System
+# Quorum — Multi-Agent Research & Fact-Verification System
 
-**INNOVA HACK 2026 | Gen AI Track | Problem Statement 1**
-
-Four AI agents research, cross-verify, detect hallucinations, and compile citation-backed reports — with real-time pipeline visualization.
+Four AI agents research, cross-verify, detect hallucinations, and compile citation-backed reports — with real-time pipeline visualization, history, shareable links, batch mode, and PDF export.
 
 ## Architecture
 
@@ -11,33 +9,73 @@ Topic Input
     │
     ▼
 ┌─────────────────┐
-│  Researcher     │ ── Extracts claims & sources
+│  Researcher     │ ── Multi-source claim extraction
 └────────┬────────┘
          ▼
 ┌─────────────────────┐
-│ Cross-Verifier      │ ── Independently checks each claim
+│ Cross-Verifier      │ ── Independent cross-referencing
 └────────┬────────────┘
          ▼
 ┌──────────────────────────┐
-│ Contradiction Detector   │ ── Finds conflicts & hallucinations
+│ Contradiction Detector   │ ── Hallucination & conflict detection
 └────────┬─────────────────┘
          ▼
 ┌──────────────────┐
-│ Synthesizer      │ ── Citation-backed report + confidence scores
+│ Synthesizer      │ ── Citation-backed report with confidence scores
 └──────────────────┘
 ```
 
 ## Tech Stack
 
-- **Frontend**: Vite + React + Tailwind CSS + Framer Motion
-- **Backend**: Python + FastAPI + Anthropic/Claude API
-- **Design**: Linear/Vercel-grade dark theme, Space Grotesk + Inter fonts
+| Layer | Technology |
+|-------|-----------|
+| **Frontend** | React 19, TypeScript, Vite 8, Tailwind CSS v4 |
+| **Animations** | Framer Motion |
+| **Icons** | Lucide React |
+| **Backend** | Python 3, FastAPI, Anthropic Claude API |
+| **Deploy** | Vercel (frontend) + Render (backend) |
+
+## Features
+
+### Core Pipeline
+| Feature | Description |
+|---------|-------------|
+| **4-Agent Pipeline** | Research → Verify → Detect → Synthesize, each as a separate LLM call |
+| **Real-time Visualization** | Animated agent handoff with glowing connections and live terminal log |
+| **Claim-Level Report** | Expandable cards with confidence scores, reasoning, supporting/contradicting sources |
+| **Source Trust Ledger** | Ranked source reliability with trust bars |
+| **Pipeline Performance** | Per-agent timing breakdown |
+
+### History & Sharing (P1)
+| Feature | Description |
+|---------|-------------|
+| **Report History** | localStorage-persisted history with session stats (total reports, claims, avg confidence, flagged) |
+| **Delete Entries** | Remove individual history items |
+| **Shareable Links** | Hash-based routing (`/#reportId`) — read-only standalone report view |
+| **Copy Share Link** | One-click clipboard copy with toast confirmation |
+
+### Batch & Export (P2)
+| Feature | Description |
+|---------|-------------|
+| **Batch Verify** | Add 2-5 claims, run all through pipeline, side-by-side comparison grid |
+| **PDF Export** | Quorum-branded printable report via browser print dialog |
+| **Toast Notifications** | Feedback for copy/save/share actions |
+
+### Polish
+| Feature | Description |
+|---------|-------------|
+| **Demo Mode** | Full animated pipeline without API key — perfect for presentations |
+| **Live Mode** | Real backend verification with Anthropic API |
+| **Fallback** | Auto-falls back to demo if backend is unavailable |
+| **Input Validation** | Friendly error states for edge cases |
+| **Responsive** | Horizontal pipeline on desktop, vertical on mobile |
 
 ## Quick Start
 
 ### Demo Mode (no API key needed)
 ```bash
-cd factcheck-ai-v2
+git clone https://github.com/thanuj0902/Quorum.git
+cd Quorum
 npm install
 npm run dev
 # Open http://localhost:5173
@@ -57,44 +95,52 @@ cd ..
 npm run dev
 ```
 
-### Deploy to Vercel
-```bash
-npm run build
-# Deploy dist/ to Vercel
-# Set ANTHROPIC_API_KEY as environment variable
-```
-
-## Features
-
-| Module | Description |
-|--------|-------------|
-| **Research Agent** | Extracts factual claims from multiple sources |
-| **Cross-Verification Agent** | Independently verifies each claim (separate API call) |
-| **Contradiction Detector** | Flags conflicts, hallucinations, and imprecise claims |
-| **Synthesizer** | Citation-backed report with per-claim confidence scores |
-| **Pipeline Visualizer** | Real-time animated agent handoff (the demo moment) |
-| **Claim-Level Report** | Expandable cards with sources, confidence tiers, flags |
-| **Source Trust Ledger** | Running record of source reliability across the session |
-
 ## Project Structure
 
 ```
-factcheck-ai-v2/
+Quorum/
 ├── src/
 │   ├── components/
-│   │   ├── Landing/     # Hero, PipelinePreview, HowItWorks, WhyDifferent
-│   │   ├── Pipeline/    # PipelineVisualizer, AgentNode
-│   │   └── Report/      # ClaimCard, ConfidenceReport, SourceTrustLedger
-│   ├── hooks/           # usePipeline (demo + live mode)
-│   ├── data/            # Demo data for hackathon presentation
-│   ├── App.jsx
-│   └── index.css
+│   │   ├── Landing/        # Hero, HowItWorks, WhyDifferent, Metrics
+│   │   ├── Pipeline/       # PipelineView, PipelineVisualizer, BatchView
+│   │   ├── Report/         # ClaimCard, ConfidenceReport, SourceTrustLedger
+│   │   ├── History/        # HistoryView, ReportView
+│   │   └── ui/             # Logo, ShareMenu, Toast, ErrorBoundary
+│   ├── hooks/              # usePipeline, useHistory, useToast
+│   ├── data/               # Agent configs, demo report data
+│   ├── types/              # TypeScript interfaces
+│   ├── lib/                # Utilities (cn)
+│   ├── utils/              # Colors, PDF export
+│   ├── App.tsx
+│   └── main.tsx
 ├── backend/
-│   ├── main.py          # FastAPI with 4 separate agent API calls
+│   ├── main.py             # FastAPI with 4 agent endpoints
 │   └── requirements.txt
+├── tsconfig.json
+├── vite.config.ts
 └── vercel.json
 ```
 
-## Demo Mode
+## Design System
 
-Click "Watch it verify a claim" on the landing page to run a full animated pipeline with simulated multi-agent data. No API key required — perfect for hackathon presentations.
+| Token | Value |
+|-------|-------|
+| Background | `#0A0A0B` |
+| Surface | `#111114` |
+| Border | `#222230` |
+| Accent | `#7C3AED` (purple) |
+| Green | `#34D399` |
+| Yellow | `#FBBF24` |
+| Red | `#F87171` |
+| Fonts | Space Grotesk (display), Inter (body), JetBrains Mono (mono) |
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `ANTHROPIC_API_KEY` | No | Enables live verification mode |
+| `ALLOWED_ORIGINS` | No | CORS origins (defaults include Vercel domain) |
+
+## License
+
+MIT
