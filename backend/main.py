@@ -824,6 +824,13 @@ async def test_llm():
     return results
 
 
+@app.get("/api/test-search")
+async def test_search():
+    loop = asyncio.get_event_loop()
+    results = await loop.run_in_executor(None, _ddg_search_sync, "climate change", 3)
+    return {"count": len(results), "results": results}
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
