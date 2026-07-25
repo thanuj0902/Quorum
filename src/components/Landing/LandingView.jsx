@@ -1,6 +1,5 @@
 import Logo from '../ui/Logo'
 import Hero from './Hero'
-import PipelinePreview from './PipelinePreview'
 import HowItWorks from './HowItWorks'
 import WhyDifferent from './WhyDifferent'
 import LandingFooter from './LandingFooter'
@@ -11,19 +10,16 @@ export default function LandingView({ onStart }) {
       <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4 bg-base/80 backdrop-blur-xl border-b border-border/50" role="navigation" aria-label="Main navigation">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <Logo onClick={onStart} />
-          <div className="flex items-center gap-3">
-          </div>
         </div>
       </nav>
 
       <main>
         <Hero onStart={onStart} />
-        <PipelinePreview />
         <HowItWorks />
         <WhyDifferent />
       </main>
 
-      <LandingFooter onStart={onStart} />
+      <LandingFooter />
     </>
   )
 }

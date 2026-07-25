@@ -2,55 +2,52 @@ import { motion } from 'framer-motion'
 import { Search, ShieldCheck, AlertTriangle, FileText } from 'lucide-react'
 
 const steps = [
-  { icon: Search, label: 'Research', desc: 'Extracts claims from multiple sources' },
-  { icon: ShieldCheck, label: 'Verify', desc: 'Cross-checks each claim independently' },
-  { icon: AlertTriangle, label: 'Detect Contradictions', desc: 'Flags conflicts and hallucinations' },
-  { icon: FileText, label: 'Synthesize', desc: 'Citation-backed report with scores' },
+  { icon: Search, label: 'Research', desc: 'Extracts claims from sources' },
+  { icon: ShieldCheck, label: 'Verify', desc: 'Cross-checks independently' },
+  { icon: AlertTriangle, label: 'Detect', desc: 'Flags conflicts & hallucinations' },
+  { icon: FileText, label: 'Synthesize', desc: 'Citation-backed report' },
 ]
 
 export default function HowItWorks() {
   return (
-    <section className="py-28 px-6" aria-labelledby="how-it-works-heading">
-      <div className="max-w-5xl mx-auto">
+    <section className="py-20 px-6" aria-labelledby="how-it-works-heading">
+      <div className="max-w-4xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-16"
+          className="text-center mb-12"
         >
           <p className="text-accent text-xs font-semibold uppercase tracking-[0.2em] mb-4">Process</p>
           <h2 id="how-it-works-heading" className="font-display text-3xl md:text-[2.5rem] font-bold tracking-tight">How it works</h2>
         </motion.div>
 
-        <ol className="grid grid-cols-1 md:grid-cols-4 gap-5 list-none" role="list">
+        <div className="flex flex-col md:flex-row items-center gap-4 md:gap-0">
           {steps.map((step, i) => (
-            <motion.li
+            <motion.div
               key={step.label}
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: i * 0.1 }}
-              className="relative group"
+              transition={{ duration: 0.4, delay: i * 0.08 }}
+              className="flex items-center gap-4 flex-1 w-full md:w-auto"
             >
-              <div className="text-center">
-                <div className="w-16 h-16 rounded-2xl bg-accent-dim border border-accent/15 flex items-center justify-center mx-auto mb-5 group-hover:border-accent/30 group-hover:bg-accent/[0.14] transition-all duration-300" aria-hidden="true">
-                  <step.icon className="w-6 h-6 text-accent" strokeWidth={1.5} />
+              <div className="flex items-center gap-4 flex-1 bg-surface border border-border rounded-2xl p-5 hover:border-accent/30 transition-all duration-300 group">
+                <div className="w-12 h-12 rounded-xl bg-accent-dim border border-accent/15 flex items-center justify-center shrink-0 group-hover:border-accent/30 transition-colors" aria-hidden="true">
+                  <step.icon className="w-5 h-5 text-accent" strokeWidth={1.5} />
                 </div>
-                <div className="text-[11px] text-accent/60 font-mono mb-2 tracking-wider">0{i + 1}</div>
-                <h3 className="font-display text-lg font-semibold mb-2">{step.label}</h3>
-                <p className="text-text-secondary text-sm leading-relaxed max-w-[220px] mx-auto">{step.desc}</p>
+                <div>
+                  <div className="font-display text-sm font-semibold">{step.label}</div>
+                  <div className="text-text-secondary text-xs mt-0.5">{step.desc}</div>
+                </div>
               </div>
-
               {i < steps.length - 1 && (
-                <div className="hidden md:flex absolute top-8 -right-3 items-center" aria-hidden="true">
-                  <div className="w-6 h-px bg-gradient-to-r from-accent/30 to-transparent" />
-                  <div className="w-1 h-1 rounded-full bg-accent/30" />
-                </div>
+                <div className="hidden md:block text-accent/30 text-lg shrink-0 px-1" aria-hidden="true">→</div>
               )}
-            </motion.li>
+            </motion.div>
           ))}
-        </ol>
+        </div>
       </div>
     </section>
   )
