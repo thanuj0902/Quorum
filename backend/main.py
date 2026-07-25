@@ -138,6 +138,11 @@ async def call_llm(system_prompt: str, user_prompt: str, api_key: str) -> str:
                         ],
                     },
                 )
+                if response.status_code == 429:
+                    retry_after = int(response.headers.get("retry-after", 5))
+                    logger.warning(f"Groq rate limited, waiting {retry_after}s (attempt {attempt + 1})")
+                    await asyncio.sleep(retry_after)
+                    continue
                 response.raise_for_status()
                 data = response.json()
 
@@ -149,7 +154,7 @@ async def call_llm(system_prompt: str, user_prompt: str, api_key: str) -> str:
             last_error = e
             logger.warning(f"LLM call attempt {attempt + 1} failed: {e}")
             if attempt < MAX_RETRIES:
-                await asyncio.sleep(1 * (attempt + 1))
+                await asyncio.sleep(2 * (attempt + 1))
 
     raise HTTPException(status_code=502, detail="The verification pipeline is temporarily unavailable. Please try again.")
 
@@ -558,7 +563,7 @@ Return JSON with exactly these fields:
     }
 
 
-# --- Pipeline execution with optional SSE ---
+# --- Pipeline execution ---
 
 async def run_pipeline(topic: str, api_key: str):
     pipeline_log = []
@@ -572,15 +577,21 @@ async def run_pipeline(topic: str, api_key: str):
     pipeline_log.append(log1)
     yield {"event": "agent_complete", "data": json.dumps(log1)}
 
+    await asyncio.sleep(1)
+
     # Step 2: Verify
     verified, log2 = await verifier_agent(claims, topic, api_key, search_results)
     pipeline_log.append(log2)
     yield {"event": "agent_complete", "data": json.dumps(log2)}
 
+    await asyncio.sleep(1)
+
     # Step 3: Contradiction detection
     flags, log3 = await contradiction_agent(verified, topic, api_key)
     pipeline_log.append(log3)
     yield {"event": "agent_complete", "data": json.dumps(log3)}
+
+    await asyncio.sleep(1)
 
     # Step 4: Calculate algorithmic confidence for each claim
     for claim in verified:
