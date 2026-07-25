@@ -129,7 +129,7 @@ async def call_llm(system_prompt: str, user_prompt: str, api_key: str) -> str:
                         "Content-Type": "application/json",
                     },
                     json={
-                        "model": "llama-3.1-70b-versatile",
+                        "model": "llama-3.3-70b-versatile",
                         "max_tokens": 8192,
                         "temperature": 0.3,
                         "messages": [
