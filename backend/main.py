@@ -18,7 +18,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("quorum")
 
-app = FastAPI(title="Quorum", version="2.3.0", description="Multi-agent AI fact-verification system")
+app = FastAPI(title="Quorum", version="2.4.0", description="Multi-agent AI fact-verification system")
 
 MAX_TOPIC_LENGTH = 500
 MAX_RETRIES = 2
@@ -595,19 +595,24 @@ async def run_pipeline(topic: str, api_key: str):
     pipeline_start = time.time()
 
     # Step 0: Web search
+    logger.info(f"[Pipeline] Starting search for: {topic[:50]}")
     search_results = await web_search(topic, max_results=5)
+    logger.info(f"[Pipeline] Search returned {len(search_results)} results")
 
     # Step 1: Research
+    logger.info("[Pipeline] Starting research agent")
     claims, log1 = await research_agent(topic, api_key, search_results)
     pipeline_log.append(log1)
     yield {"event": "agent_complete", "data": json.dumps(log1)}
 
     # Step 2: Verify
+    logger.info("[Pipeline] Starting verifier agent")
     verified, log2 = await verifier_agent(claims, topic, api_key, search_results)
     pipeline_log.append(log2)
     yield {"event": "agent_complete", "data": json.dumps(log2)}
 
     # Step 3: Contradiction detection
+    logger.info("[Pipeline] Starting contradiction agent")
     flags, log3 = await contradiction_agent(verified, topic, api_key)
     pipeline_log.append(log3)
     yield {"event": "agent_complete", "data": json.dumps(log3)}
@@ -676,14 +681,20 @@ async def research(request: ResearchRequest):
         )
 
     # Non-streaming: collect all events and return final result
-    result = None
-    async for event in run_pipeline(request.topic, api_key):
-        if event["event"] == "complete":
-            result = json.loads(event["data"])
+    try:
+        result = None
+        async for event in run_pipeline(request.topic, api_key):
+            if event["event"] == "complete":
+                result = json.loads(event["data"])
 
-    if result:
-        return result
-    raise HTTPException(status_code=500, detail="Pipeline failed")
+        if result:
+            return result
+        raise HTTPException(status_code=500, detail="Pipeline failed")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Pipeline endpoint error: {e}", exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Pipeline error: {str(e)[:200]}")
 
 
 @app.post("/api/batch")
@@ -761,7 +772,7 @@ async def health():
     return {
         "status": "ok",
         "service": "Quorum",
-        "version": "2.3.0",
+        "version": "2.4.0",
         "providers": {
             "groq": bool(api_key),
             "gemini": bool(gemini_key),
