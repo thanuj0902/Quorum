@@ -1,15 +1,27 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import ErrorBoundary from './components/ui/ErrorBoundary'
-import LandingView from './components/Landing/LandingView'
-import PipelineView from './components/Pipeline/PipelineView'
-import HistoryView from './components/History/HistoryView'
-import ReportView from './components/History/ReportView'
 import ToastContainer from './components/ui/Toast'
 import { usePipeline } from './hooks/usePipeline'
 import { useHistory } from './hooks/useHistory'
 import { useToast } from './hooks/useToast'
 import type { AppView } from './types'
+
+const LandingView = lazy(() => import('./components/Landing/LandingView'))
+const PipelineView = lazy(() => import('./components/Pipeline/PipelineView'))
+const HistoryView = lazy(() => import('./components/History/HistoryView'))
+const ReportView = lazy(() => import('./components/History/ReportView'))
+
+function LoadingSpinner() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-base">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-6 h-6 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
+        <span className="text-text-secondary text-xs font-mono">Loading...</span>
+      </div>
+    </div>
+  )
+}
 
 export default function App() {
   const [view, setView] = useState<AppView>('landing')
@@ -66,85 +78,87 @@ export default function App() {
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-base text-text noise-overlay">
-        <AnimatePresence mode="wait">
-          {view === 'landing' && (
-            <motion.div
-              key="landing"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <LandingView onStart={handleStart} onHistory={() => setView('history')} />
-            </motion.div>
-          )}
+        <Suspense fallback={<LoadingSpinner />}>
+          <AnimatePresence mode="wait">
+            {view === 'landing' && (
+              <motion.div
+                key="landing"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <LandingView onStart={handleStart} onHistory={() => setView('history')} />
+              </motion.div>
+            )}
 
-          {view === 'pipeline' && (
-            <motion.div
-              key="pipeline"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="min-h-screen"
-            >
-              <PipelineView
-                phase={phase}
-                pipelineState={pipelineState}
-                report={report}
-                error={error}
-                onBack={handleBack}
-                onAnalyze={runLivePipeline}
-                onSaveReport={() => {
-                  if (report) {
-                    const id = saveReport(report)
-                    addToast('Report saved to history', 'success')
-                    return id
-                  }
-                }}
-                onViewHistory={() => setView('history')}
-              />
-            </motion.div>
-          )}
+            {view === 'pipeline' && (
+              <motion.div
+                key="pipeline"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="min-h-screen"
+              >
+                <PipelineView
+                  phase={phase}
+                  pipelineState={pipelineState}
+                  report={report}
+                  error={error}
+                  onBack={handleBack}
+                  onAnalyze={runLivePipeline}
+                  onSaveReport={() => {
+                    if (report) {
+                      const id = saveReport(report)
+                      addToast('Report saved to history', 'success')
+                      return id
+                    }
+                  }}
+                  onViewHistory={() => setView('history')}
+                />
+              </motion.div>
+            )}
 
-          {view === 'history' && (
-            <motion.div
-              key="history"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <HistoryView
-                history={history}
-                stats={stats}
-                onSelect={(id) => {
-                  setSelectedReportId(id)
-                  setView('report')
-                }}
-                onDelete={deleteEntry}
-                onBack={handleHistoryBack}
-              />
-            </motion.div>
-          )}
+            {view === 'history' && (
+              <motion.div
+                key="history"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <HistoryView
+                  history={history}
+                  stats={stats}
+                  onSelect={(id) => {
+                    setSelectedReportId(id)
+                    setView('report')
+                  }}
+                  onDelete={deleteEntry}
+                  onBack={handleHistoryBack}
+                />
+              </motion.div>
+            )}
 
-          {view === 'report' && selectedEntry && (
-            <motion.div
-              key="report"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <ReportView
-                report={selectedEntry.fullReport}
-                onBack={handleReportBack}
-                onCopyLink={handleCopyLink}
-                linkCopied={linkCopied}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+            {view === 'report' && selectedEntry && (
+              <motion.div
+                key="report"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <ReportView
+                  report={selectedEntry.fullReport}
+                  onBack={handleReportBack}
+                  onCopyLink={handleCopyLink}
+                  linkCopied={linkCopied}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </Suspense>
 
         <ToastContainer toasts={toasts} onRemove={removeToast} />
       </div>

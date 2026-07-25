@@ -51,9 +51,13 @@ function LandingFooter() {
             <span className="text-text-secondary/30 text-xs font-mono">
               &copy; {new Date().getFullYear()} Quorum. Open-source multi-agent AI fact-verification.
             </span>
-            <span className="text-text-secondary/30 text-xs">
-              Built with TypeScript, React, FastAPI, and Anthropic Claude
-            </span>
+            <div className="flex items-center gap-4">
+              <a href="/privacy.html" className="text-text-secondary/30 text-xs hover:text-text-secondary/60 transition-colors">Privacy Policy</a>
+              <a href="/terms.html" className="text-text-secondary/30 text-xs hover:text-text-secondary/60 transition-colors">Terms of Service</a>
+              <span className="text-text-secondary/30 text-xs">
+                Built with TypeScript, React, FastAPI, and Anthropic Claude
+              </span>
+            </div>
           </div>
           <p className="text-text-secondary/20 text-[11px] text-center mt-4 leading-relaxed max-w-2xl mx-auto">
             Quorum is a free, open-source multi-agent AI fact-verification system that uses four independent AI agents — Research, Verification, Hallucination Detection, and Synthesis — to verify claims with citation-backed evidence. Every claim is sourced, every confidence score is explainable, and every report is shareable.
