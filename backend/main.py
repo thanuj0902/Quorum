@@ -12,9 +12,9 @@ import httpx
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("factcheck")
+logger = logging.getLogger("quorum")
 
-app = FastAPI(title="FactCheck AI", version="2.0.0")
+app = FastAPI(title="Quorum", version="2.1.0", description="Multi-agent AI fact-verification system")
 
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000,https://quorum-liart.vercel.app").split(",")
 app.add_middleware(
@@ -52,7 +52,7 @@ async def call_llm(system_prompt: str, user_prompt: str, api_key: str) -> str:
     last_error = None
     for attempt in range(MAX_RETRIES + 1):
         try:
-            async with httpx.AsyncClient(timeout=90.0) as client:
+            async with httpx.AsyncClient(timeout=120.0) as client:
                 response = await client.post(
                     "https://api.anthropic.com/v1/messages",
                     headers={
@@ -62,7 +62,7 @@ async def call_llm(system_prompt: str, user_prompt: str, api_key: str) -> str:
                     },
                     json={
                         "model": "claude-sonnet-4-20250514",
-                        "max_tokens": 4096,
+                        "max_tokens": 8192,
                         "system": system_prompt,
                         "messages": [{"role": "user", "content": user_prompt}],
                     },
@@ -100,16 +100,20 @@ def parse_agent_json(raw: str, agent_name: str) -> list | dict:
 async def research_agent(topic: str, api_key: str) -> tuple[list[dict], dict]:
     safe_topic = sanitize_input(topic)
     system = (
-        "You are the Research Agent. Extract factual claims from research topics. "
-        "Return ONLY valid JSON. Never fabricate claims — if uncertain, lower the confidence score."
+        "You are the Research Agent in a multi-agent fact-verification system called Quorum. "
+        "Your job is to extract factual, verifiable claims from research topics. "
+        "For each claim, you MUST provide a detailed 'reasoning' field explaining your evidence and confidence. "
+        "Never fabricate claims — if uncertain about a fact, lower the confidence score. "
+        "Return ONLY valid JSON — no markdown, no explanation outside the JSON."
     )
     prompt = f'''Analyze the topic: "{safe_topic}"
 
-Extract 8-12 key factual claims. For each, provide:
-- claim: the factual statement
-- source: source reference (publication, organization, or URL)
-- confidence: initial confidence 0.0-1.0
+Extract 6-10 key factual claims. For each, provide:
+- claim: the factual statement (be specific, avoid vague claims)
+- source: primary source reference (publication, organization, or research institution)
+- confidence: initial confidence 0.0-1.0 based on how well-sourced the claim is
 - category: one of [statistic, historical, scientific, financial, technical, general]
+- reasoning: a 1-2 sentence explanation of why this claim is made and what evidence supports it
 
 Return a JSON array. No markdown, no explanation.'''
 
@@ -118,11 +122,11 @@ Return a JSON array. No markdown, no explanation.'''
     claims = parse_agent_json(result, "Research Agent")
     duration = time.time() - start
 
-    logger.info(f"Research Agent: {len(claims)} claims in {duration:.2f}s")
+    logger.info(f"Research Agent: {len(claims)} claims extracted in {duration:.2f}s")
     return claims, {
         "agent": "researcher",
-        "input_data": {"topic": safe_topic},
-        "output_data": {"claims_count": len(claims)},
+        "status": "done",
+        "message": f"Extracted {len(claims)} claims from multiple sources",
         "duration": round(duration, 2),
     }
 
@@ -130,37 +134,45 @@ Return a JSON array. No markdown, no explanation.'''
 async def verifier_agent(claims: list[dict], topic: str, api_key: str) -> tuple[list[dict], dict]:
     safe_topic = sanitize_input(topic)
     claims_text = "\n".join([
-        f"- {c.get('claim', '')} (Source: {c.get('source', 'unknown')}, Category: {c.get('category', 'general')})"
+        f"- {c.get('claim', '')} (Source: {c.get('source', 'unknown')}, Category: {c.get('category', 'general')}, Confidence: {c.get('confidence', 0)})"
         for c in claims
     ])
 
     system = (
-        "You are the Cross-Verification Agent. Independently verify each claim against multiple sources. "
-        "Return ONLY valid JSON. If a claim cannot be verified, mark it as unverified."
+        "You are the Cross-Verification Agent in Quorum's multi-agent pipeline. "
+        "Your job is to independently verify each claim against multiple reliable sources. "
+        "You must provide detailed 'reasoning' for each verification decision. "
+        "Track supporting AND contradicting sources separately. "
+        "Return ONLY valid JSON — no markdown, no explanation outside the JSON."
     )
     prompt = f'''Verify these claims about: "{safe_topic}"
 
-Claims:
+Claims to verify:
 {claims_text}
 
 For EACH claim:
 1. Cross-reference against your knowledge of multiple reliable sources
 2. Determine: verified, partially_verified, unverified, or contradicted
-3. List supporting and contradicting sources
-4. Adjust confidence based on verification (higher if multiple sources agree)
+3. List specific supporting sources (institution names, publications)
+4. List specific contradicting sources if any exist
+5. Adjust confidence based on source agreement
+6. Provide detailed reasoning explaining your verification decision
 
-Return a JSON array with: claim, source, confidence, verification_status, supporting_sources, contradicting_sources.'''
+Return a JSON array with exactly these fields per claim:
+claim, source, confidence (0.0-1.0), verification_status, supporting_sources (array of source names), contradicting_sources (array of source names), reasoning (1-2 sentences explaining verification)'''
 
     start = time.time()
     result = await call_llm(system, prompt, api_key)
     verified = parse_agent_json(result, "Verification Agent")
     duration = time.time() - start
 
-    logger.info(f"Verification Agent: {len(verified)} claims verified in {duration:.2f}s")
+    verified_count = sum(1 for v in verified if v.get("verification_status") == "verified")
+    partial_count = sum(1 for v in verified if v.get("verification_status") == "partially_verified")
+    logger.info(f"Verification Agent: {verified_count} verified, {partial_count} partial in {duration:.2f}s")
     return verified, {
         "agent": "verifier",
-        "input_data": {"claims_count": len(claims)},
-        "output_data": {"verified_count": len(verified)},
+        "status": "done",
+        "message": f"{verified_count} verified, {partial_count} partial out of {len(verified)} claims",
         "duration": round(duration, 2),
     }
 
@@ -168,27 +180,33 @@ Return a JSON array with: claim, source, confidence, verification_status, suppor
 async def contradiction_agent(verified_claims: list[dict], topic: str, api_key: str) -> tuple[list[dict], dict]:
     safe_topic = sanitize_input(topic)
     claims_text = "\n".join([
-        f"- {c.get('claim', '')} [Status: {c.get('verification_status', 'unknown')}, Confidence: {c.get('confidence', 0)}]"
+        f"- {c.get('claim', '')} [Status: {c.get('verification_status', 'unknown')}, Confidence: {c.get('confidence', 0)}, Sources: {', '.join(c.get('supporting_sources', [])[:3])}]"
         for c in verified_claims
     ])
 
     system = (
-        "You are the Contradiction and Hallucination Detector. Find contradictions between claims "
-        "and detect hallucinated or fabricated claims. Return ONLY valid JSON."
+        "You are the Contradiction and Hallucination Detector in Quorum's multi-agent pipeline. "
+        "Your job is to find contradictions between claims and detect hallucinated or fabricated information. "
+        "You must provide detailed reasoning for each flag. "
+        "Return ONLY valid JSON — no markdown, no explanation outside the JSON."
     )
     prompt = f'''Analyze these verified claims about: "{safe_topic}"
 
 Claims:
 {claims_text}
 
-For EACH claim, determine:
-- is_hallucination: true/false
-- reason: explanation of why it is or is not a hallucination
+For EACH claim, analyze:
+- is_hallucination: true/false — is this claim fabricated or significantly distorted?
+- reason: detailed explanation (2-3 sentences) of why it is or is not a hallucination
 - severity: none, low, medium, high, critical
+- evidence_gaps: what additional evidence would strengthen or weaken this claim?
 
-Also add an OVERALL_ASSESSMENT entry with claim="OVERALL_ASSESSMENT".
+Also provide an OVERALL_ASSESSMENT entry with claim="OVERALL_ASSESSMENT" summarizing:
+- Total claims analyzed
+- Hallucinations found
+- Overall source quality assessment
 
-Return a JSON array with: claim, is_hallucination, reason, severity.'''
+Return a JSON array with: claim, is_hallucination, reason, severity, evidence_gaps.'''
 
     start = time.time()
     result = await call_llm(system, prompt, api_key)
@@ -196,11 +214,12 @@ Return a JSON array with: claim, is_hallucination, reason, severity.'''
     duration = time.time() - start
 
     flagged = sum(1 for f in flags if f.get("is_hallucination"))
-    logger.info(f"Contradiction Detector: {flagged} flagged in {duration:.2f}s")
+    severe = sum(1 for f in flags if f.get("severity") in ("high", "critical"))
+    logger.info(f"Contradiction Detector: {flagged} hallucinations found ({severe} severe) in {duration:.2f}s")
     return flags, {
         "agent": "contradiction",
-        "input_data": {"claims_count": len(verified_claims)},
-        "output_data": {"flags_count": len(flags), "hallucinations_found": flagged},
+        "status": "done",
+        "message": f"{flagged} issues flagged ({severe} high-severity)",
         "duration": round(duration, 2),
     }
 
@@ -213,14 +232,16 @@ async def synthesizer_agent(
 ) -> tuple[dict, dict]:
     safe_topic = sanitize_input(topic)
     claims_text = "\n".join([
-        f"- {c.get('claim', '')} [Status: {c.get('verification_status', 'unknown')}, Confidence: {c.get('confidence', 0)}]"
+        f"- {c.get('claim', '')} [Status: {c.get('verification_status', 'unknown')}, Confidence: {c.get('confidence', 0)}, Reasoning: {c.get('reasoning', 'N/A')[:100]}]"
         for c in verified_claims
     ])
     halluc_data = [h for h in hallucinations if h.get("is_hallucination")]
 
     system = (
-        "You are the Synthesis and Confidence Agent. Compile a citation-backed report with confidence scores. "
-        "Return ONLY valid JSON."
+        "You are the Synthesis and Confidence Agent in Quorum's multi-agent pipeline. "
+        "Your job is to compile a citation-backed report with accurate confidence scores. "
+        "You must provide detailed reasoning for the overall confidence assessment. "
+        "Return ONLY valid JSON — no markdown, no explanation outside the JSON."
     )
     prompt = f'''Compile a report on: "{safe_topic}"
 
@@ -230,24 +251,35 @@ Verified Claims:
 Hallucination Flags: {json.dumps(halluc_data)}
 
 Calculate overall_confidence (0.0-1.0) based on:
-- How many claims were verified vs unverified
+- Percentage of claims that were verified vs unverified/contradicted
 - Average confidence of verified claims
-- Whether hallucinations were detected
+- Severity of any hallucinations detected
+- Source agreement across claims
 
-Write a 3-5 sentence executive summary.
+Write a 3-5 sentence executive summary that:
+1. States the overall reliability of the research
+2. Highlights the strongest findings
+3. Notes the most contested or uncertain claims
+4. Provides actionable confidence guidance
 
-Return JSON: {{"overall_confidence": float, "summary": "string"}}'''
+Return JSON with exactly these fields:
+{{
+  "overall_confidence": float (0.0-1.0),
+  "summary": "detailed executive summary",
+  "confidence_reasoning": "1-2 sentence explanation of how confidence was calculated"
+}}'''
 
     start = time.time()
     result = await call_llm(system, prompt, api_key)
     report_data = parse_agent_json(result, "Synthesizer")
     duration = time.time() - start
 
-    logger.info(f"Synthesizer: confidence={report_data.get('overall_confidence', 0)} in {duration:.2f}s")
+    conf = report_data.get("overall_confidence", 0)
+    logger.info(f"Synthesizer: overall confidence={conf} in {duration:.2f}s")
     return report_data, {
         "agent": "synthesizer",
-        "input_data": {"claims_count": len(verified_claims)},
-        "output_data": {"confidence": report_data.get("overall_confidence", 0)},
+        "status": "done",
+        "message": f"Report compiled — {round(conf * 100)}% overall confidence",
         "duration": round(duration, 2),
     }
 
@@ -259,6 +291,7 @@ async def research(request: ResearchRequest):
         raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not configured")
 
     pipeline_log = []
+    pipeline_start = time.time()
 
     try:
         claims, log1 = await research_agent(request.topic, api_key)
@@ -273,15 +306,19 @@ async def research(request: ResearchRequest):
         report_data, log4 = await synthesizer_agent(request.topic, verified, hallucinations, api_key)
         pipeline_log.append(log4)
 
+        total_duration = round(time.time() - pipeline_start, 2)
+
         return {
             "status": "success",
             "report": {
                 "topic": request.topic,
                 "overall_confidence": report_data.get("overall_confidence", 0),
                 "summary": report_data.get("summary", ""),
+                "confidence_reasoning": report_data.get("confidence_reasoning", ""),
                 "claims": verified,
                 "hallucinations": hallucinations,
                 "pipeline_log": pipeline_log,
+                "total_duration": total_duration,
             },
         }
     except HTTPException:
@@ -293,7 +330,14 @@ async def research(request: ResearchRequest):
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "service": "FactCheck AI v2"}
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    return {
+        "status": "ok",
+        "service": "Quorum",
+        "version": "2.1.0",
+        "api_key_configured": bool(api_key),
+        "pipeline_agents": ["researcher", "verifier", "contradiction", "synthesizer"],
+    }
 
 
 if __name__ == "__main__":

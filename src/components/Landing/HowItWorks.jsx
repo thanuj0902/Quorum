@@ -2,51 +2,79 @@ import { motion } from 'framer-motion'
 import { Search, ShieldCheck, AlertTriangle, FileText } from 'lucide-react'
 
 const steps = [
-  { icon: Search, label: 'Research', desc: 'Extracts claims from sources' },
-  { icon: ShieldCheck, label: 'Verify', desc: 'Cross-checks independently' },
-  { icon: AlertTriangle, label: 'Detect', desc: 'Flags conflicts & hallucinations' },
-  { icon: FileText, label: 'Synthesize', desc: 'Citation-backed report' },
+  { icon: Search, label: 'Research', desc: 'Extracts claims from multiple sources', color: 'accent' },
+  { icon: ShieldCheck, label: 'Verify', desc: 'Cross-checks each claim independently', color: 'green' },
+  { icon: AlertTriangle, label: 'Detect', desc: 'Flags conflicts & hallucinations', color: 'orange' },
+  { icon: FileText, label: 'Synthesize', desc: 'Citation-backed report with scores', color: 'accent' },
 ]
+
+const colorMap = {
+  accent: { bg: 'bg-accent-dim', border: 'border-accent/15', text: 'text-accent', hover: 'hover:border-accent/40' },
+  green: { bg: 'bg-green-dim', border: 'border-green/15', text: 'text-green', hover: 'hover:border-green/40' },
+  orange: { bg: 'bg-orange/10', border: 'border-orange/15', text: 'text-orange', hover: 'hover:border-orange/40' },
+}
 
 export default function HowItWorks() {
   return (
-    <section className="py-20 px-6" aria-labelledby="how-it-works-heading">
-      <div className="max-w-4xl mx-auto">
+    <section className="py-24 px-6" aria-labelledby="how-it-works-heading">
+      <div className="max-w-5xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-12"
+          className="text-center mb-16"
         >
           <p className="text-accent text-xs font-semibold uppercase tracking-[0.2em] mb-4">Process</p>
           <h2 id="how-it-works-heading" className="font-display text-3xl md:text-[2.5rem] font-bold tracking-tight">How it works</h2>
         </motion.div>
 
-        <div className="flex flex-col md:flex-row items-center gap-4 md:gap-0">
-          {steps.map((step, i) => (
-            <motion.div
-              key={step.label}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.4, delay: i * 0.08 }}
-              className="flex items-center gap-4 flex-1 w-full md:w-auto"
-            >
-              <div className="flex items-center gap-4 flex-1 bg-surface border border-border rounded-2xl p-5 hover:border-accent/30 transition-all duration-300 group">
-                <div className="w-12 h-12 rounded-xl bg-accent-dim border border-accent/15 flex items-center justify-center shrink-0 group-hover:border-accent/30 transition-colors" aria-hidden="true">
-                  <step.icon className="w-5 h-5 text-accent" strokeWidth={1.5} />
-                </div>
-                <div>
-                  <div className="font-display text-sm font-semibold">{step.label}</div>
-                  <div className="text-text-secondary text-xs mt-0.5">{step.desc}</div>
-                </div>
-              </div>
-              {i < steps.length - 1 && (
-                <div className="hidden md:block text-accent/30 text-lg shrink-0 px-1" aria-hidden="true">→</div>
-              )}
-            </motion.div>
-          ))}
+        <div className="relative">
+          {/* Connecting line */}
+          <div className="hidden md:block absolute top-[40px] left-[12.5%] right-[12.5%] h-px bg-gradient-to-r from-accent/30 via-green/30 to-accent/30" aria-hidden="true" />
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+            {steps.map((step, i) => {
+              const c = colorMap[step.color]
+              return (
+                <motion.div
+                  key={step.label}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: i * 0.1 }}
+                  className="relative group"
+                >
+                  <div className="text-center">
+                    {/* Step number + icon */}
+                    <div className="relative inline-flex mb-5">
+                      <div className={`w-16 h-16 rounded-2xl ${c.bg} border ${c.border} ${c.hover} flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg`}
+                        style={{ boxShadow: 'none' }}
+                        ref={(el) => {
+                          if (el) {
+                            el.addEventListener('mouseenter', () => {
+                              el.style.boxShadow = `0 0 30px ${step.color === 'accent' ? 'rgba(124,58,237,0.2)' : step.color === 'green' ? 'rgba(52,211,153,0.2)' : 'rgba(251,146,60,0.2)'}`
+                            })
+                            el.addEventListener('mouseleave', () => {
+                              el.style.boxShadow = 'none'
+                            })
+                          }
+                        }}
+                      >
+                        <step.icon className={`w-6 h-6 ${c.text}`} strokeWidth={1.5} />
+                      </div>
+                      <span className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-base border border-border text-[10px] text-text-secondary font-mono flex items-center justify-center">
+                        {i + 1}
+                      </span>
+                    </div>
+
+                    <h3 className="font-display text-base font-semibold mb-1.5">{step.label}</h3>
+                    <p className="text-text-secondary text-sm leading-relaxed max-w-[200px] mx-auto">{step.desc}</p>
+                  </div>
+                </motion.div>
+              )
+            })}
+          </div>
         </div>
       </div>
     </section>

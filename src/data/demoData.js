@@ -10,6 +10,8 @@ export const demoReport = {
       verification_status: 'verified',
       supporting_sources: ['Nature Medicine', 'FDA Clinical Trials', 'MIT CSAIL Research'],
       contradicting_sources: [],
+      reasoning: 'Multiple peer-reviewed studies confirm this figure. The original study involved 29,000+ mammograms across 6 UK hospitals, independently replicated by FDA trials.',
+      agent_scores: { researcher: 0.88, verifier: 0.95 },
     },
     {
       claim: 'The global AI in healthcare market is projected to reach $187.95 billion by 2030, growing at a CAGR of 37.5%.',
@@ -18,6 +20,8 @@ export const demoReport = {
       verification_status: 'verified',
       supporting_sources: ['Grand View Research', 'McKinsey Health Institute'],
       contradicting_sources: ['Bloomberg Intelligence (lower estimate: $150B)'],
+      reasoning: 'The $187.95B figure comes from Grand View Research\'s 2024 report. McKinsey and Fortune Business Insights provide corroborating estimates within 15% variance.',
+      agent_scores: { researcher: 0.85, verifier: 0.89 },
     },
     {
       claim: 'Google DeepMind\'s AlphaFold has predicted 3D structures of over 200 million proteins, accelerating drug discovery timelines by approximately 40%.',
@@ -26,6 +30,8 @@ export const demoReport = {
       verification_status: 'verified',
       supporting_sources: ['DeepMind Official', 'Nature Journal', 'EMBL-EBI'],
       contradicting_sources: [],
+      reasoning: 'AlphaFold\'s 200M+ protein prediction is confirmed by DeepMind\'s official release and Nature publication. The 40% drug discovery acceleration estimate is conservative — some studies suggest higher figures.',
+      agent_scores: { researcher: 0.93, verifier: 0.95 },
     },
     {
       claim: 'AI-powered triage systems reduced emergency department wait times by an average of 35% across 12 hospitals.',
@@ -34,6 +40,8 @@ export const demoReport = {
       verification_status: 'partially_verified',
       supporting_sources: ['The Lancet Digital Health', 'Johns Hopkins Study'],
       contradicting_sources: ['Stanford Medicine meta-analysis (18-22% range)'],
+      reasoning: 'The Lancet study reports 35% reduction, but Stanford\'s larger meta-analysis across 45 studies found 18-22% range. The difference likely stems from hospital size and AI system maturity.',
+      agent_scores: { researcher: 0.70, verifier: 0.76 },
     },
     {
       claim: 'IBM Watson for Oncology failed to provide accurate treatment recommendations in 90% of test cases.',
@@ -42,6 +50,8 @@ export const demoReport = {
       verification_status: 'partially_verified',
       supporting_sources: ['STAT News', 'Internal IBM Documents (leaked)'],
       contradicting_sources: ['IBM Official Response', 'Memorial Sloan Kettering review'],
+      reasoning: 'The 90% figure originates from leaked internal documents. IBM disputes the methodology. Independent reviews suggest the failure rate is closer to 30-50% depending on cancer type and dataset.',
+      agent_scores: { researcher: 0.65, verifier: 0.51 },
     },
     {
       claim: 'Over 75% of healthcare executives plan to invest in generative AI within 18 months.',
@@ -50,6 +60,8 @@ export const demoReport = {
       verification_status: 'verified',
       supporting_sources: ['PwC Survey 2024', 'Deloitte Health Survey'],
       contradicting_sources: [],
+      reasoning: 'Both PwC (75%) and Deloitte (71%) surveys from 2024 confirm strong executive interest. The figures are consistent across multiple industry reports.',
+      agent_scores: { researcher: 0.80, verifier: 0.84 },
     },
     {
       claim: 'AI chatbots provide mental health support with clinical outcomes comparable to human therapists.',
@@ -58,6 +70,8 @@ export const demoReport = {
       verification_status: 'partially_verified',
       supporting_sources: ['JAMA Psychiatry', 'Woebot Health Clinical Trials'],
       contradicting_sources: ['APA Position Statement', 'BMJ Meta-analysis'],
+      reasoning: 'Supported for mild-to-moderate cases by JAMA Psychiatry, but overstated for moderate-to-severe cases. The blanket comparison with human therapists requires qualification based on severity.',
+      agent_scores: { researcher: 0.70, verifier: 0.60 },
     },
     {
       claim: 'ML algorithms can predict patient deterioration up to 48 hours before clinical signs, with 85% sensitivity.',
@@ -66,6 +80,8 @@ export const demoReport = {
       verification_status: 'verified',
       supporting_sources: ['Nature Biomedical Engineering', 'NHS Digital Pilot'],
       contradicting_sources: [],
+      reasoning: 'The 48-hour prediction window with 85% sensitivity is confirmed across Nature publication and NHS pilot data. The NHS study included 500+ patients across 3 hospitals.',
+      agent_scores: { researcher: 0.86, verifier: 0.90 },
     },
   ],
   hallucinations: [
@@ -104,21 +120,21 @@ export const demoPipelineMessages = {
     'Research complete — 8 claims extracted from 5 sources',
   ],
   verifier: [
-    'Cross-checking claim 1 against FDA Clinical Trials...',
+    'Cross-referencing against FDA Clinical Trials database...',
     'Verifying market projection against McKinsey report...',
     'Flagging IBM Watson claim — conflicting sources found',
     'Verification complete — 5 verified, 3 partial',
   ],
   contradiction: [
-    'Analyzing claim consistency across sources...',
+    'Analyzing claim consistency across 12 sources...',
     'Conflict detected: Lancet vs Stanford on triage wait times',
     'IBM Watson 90% figure disputed by IBM official statement',
     'Detection complete — 2 flagged, 0 critical',
   ],
   synthesizer: [
-    'Calculating confidence scores from source agreement...',
-    'Weighting source credibility tiers...',
-    'Compiling final citation-backed report...',
+    'Calculating weighted confidence from source agreement...',
+    'Scoring source reliability tiers...',
+    'Compiling citation-backed report...',
     'Report ready — 84% overall confidence',
   ],
 }

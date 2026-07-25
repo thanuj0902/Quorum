@@ -14,9 +14,6 @@ export function usePipeline() {
   const [report, setReport] = useState(null)
   const [error, setError] = useState(null)
 
-  const stateRef = useRef(pipelineState)
-  stateRef.current = pipelineState
-
   const updateState = useCallback((updates) => {
     setPipelineState(prev => ({ ...prev, ...updates }))
   }, [])
@@ -47,8 +44,10 @@ export function usePipeline() {
 
       updateState({
         activeAgent: agentId,
-        currentLog: `${agent.label}: ${agent.status}`,
+        currentLog: `$ ${agent.label} agent — ${agent.description}`,
       })
+
+      await delay(300)
 
       for (let j = 0; j < messages.length; j++) {
         await delay(PIPELINE_TIMING.AGENT_MESSAGE_MIN + Math.random() * (PIPELINE_TIMING.AGENT_MESSAGE_MAX - PIPELINE_TIMING.AGENT_MESSAGE_MIN))
@@ -94,6 +93,7 @@ export function usePipeline() {
       }
 
       const data = await res.json()
+      const timings = data.report?.pipeline_log || []
 
       for (let i = 0; i < AGENT_IDS.length; i++) {
         const agentId = AGENT_IDS[i]
@@ -111,11 +111,12 @@ export function usePipeline() {
         setPipelineState(prev => ({
           ...prev,
           completedAgents: [...AGENT_IDS.slice(0, i + 1)],
-          agentTimers: { ...prev.agentTimers, [agentId]: elapsed },
-          currentLog: `${agent.label} complete`,
+          agentTimers: { ...prev.agentTimers, [agentId]: timings[i]?.duration || elapsed },
+          currentLog: `${agent.label} complete in ${timings[i]?.duration || elapsed}s`,
         }))
       }
 
+      updateState({ activeAgent: null, currentLog: 'Pipeline complete — report generated' })
       setReport(data.report)
       setPhase('complete')
     } catch (err) {

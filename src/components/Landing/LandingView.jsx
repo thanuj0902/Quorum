@@ -3,6 +3,7 @@ import ShareMenu from '../ui/ShareMenu'
 import Hero from './Hero'
 import HowItWorks from './HowItWorks'
 import WhyDifferent from './WhyDifferent'
+import Metrics from './Metrics'
 import LandingFooter from './LandingFooter'
 
 export default function LandingView({ onStart }) {
@@ -19,6 +20,7 @@ export default function LandingView({ onStart }) {
         <Hero onStart={onStart} />
         <HowItWorks />
         <WhyDifferent />
+        <Metrics />
       </main>
 
       <LandingFooter />

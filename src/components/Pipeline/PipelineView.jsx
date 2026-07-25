@@ -46,19 +46,22 @@ export default function PipelineView({ phase, pipelineState, report, error, onBa
 
       <main className="max-w-5xl mx-auto px-6 py-10 space-y-10">
         {/* Error banner */}
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="p-4 bg-red-dim border border-red/20 rounded-2xl text-sm text-red flex items-center gap-3"
-            role="alert"
-          >
-            <div className="w-5 h-5 rounded-full bg-red/10 flex items-center justify-center shrink-0" aria-hidden="true">
-              <span className="text-red text-xs font-bold">!</span>
-            </div>
-            {error}
-          </motion.div>
-        )}
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="p-4 bg-red-dim border border-red/20 rounded-2xl text-sm text-red flex items-center gap-3"
+              role="alert"
+            >
+              <div className="w-5 h-5 rounded-full bg-red/10 flex items-center justify-center shrink-0" aria-hidden="true">
+                <span className="text-red text-xs font-bold">!</span>
+              </div>
+              {error}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Input */}
         <form onSubmit={(e) => { e.preventDefault(); handleSubmit() }} className="flex gap-3">
@@ -80,9 +83,10 @@ export default function PipelineView({ phase, pipelineState, report, error, onBa
             disabled={phase === 'running' || !topic.trim()}
             whileHover={phase !== 'running' && topic.trim() ? { scale: 1.02 } : {}}
             whileTap={phase !== 'running' && topic.trim() ? { scale: 0.98 } : {}}
-            className="px-7 py-4 bg-accent hover:bg-accent/90 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-2xl transition-all duration-300 shadow-lg shadow-accent/15 hover:shadow-accent/25 focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base"
+            className="relative px-7 py-4 bg-accent hover:bg-accent/90 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-2xl transition-all duration-300 shadow-lg shadow-accent/15 hover:shadow-accent/25 focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base overflow-hidden group"
           >
-            {phase === 'running' ? 'Analyzing...' : 'Analyze'}
+            <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-700" />
+            <span className="relative">{phase === 'running' ? 'Analyzing...' : 'Analyze'}</span>
           </motion.button>
         </form>
 
