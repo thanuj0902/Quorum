@@ -118,20 +118,21 @@ def clean_json(text: str) -> str:
 
 
 async def call_llm(system_prompt: str, user_prompt: str, api_key: str) -> str:
-    last_error = None
-    for attempt in range(MAX_RETRIES + 1):
+    # Try Groq first (fastest)
+    groq_key = os.getenv("GROQ_API_KEY")
+    if groq_key:
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
+            async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(
                     "https://api.groq.com/openai/v1/chat/completions",
                     headers={
-                        "Authorization": f"Bearer {api_key}",
+                        "Authorization": f"Bearer {groq_key}",
                         "Content-Type": "application/json",
                     },
                     json={
-                        "model": "llama-3.3-70b-versatile",
-                        "max_tokens": 8192,
-                        "temperature": 0.3,
+                        "model": "llama-3.1-8b-instant",
+                        "max_tokens": 4096,
+                        "temperature": 0.2,
                         "messages": [
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": user_prompt},
@@ -139,22 +140,38 @@ async def call_llm(system_prompt: str, user_prompt: str, api_key: str) -> str:
                     },
                 )
                 if response.status_code == 429:
-                    retry_after = int(response.headers.get("retry-after", 5))
-                    logger.warning(f"Groq rate limited, waiting {retry_after}s (attempt {attempt + 1})")
-                    await asyncio.sleep(retry_after)
-                    continue
-                response.raise_for_status()
-                data = response.json()
+                    logger.warning("Groq rate limited, falling back to Gemini")
+                elif response.status_code == 200:
+                    data = response.json()
+                    if "choices" in data and data["choices"]:
+                        return data["choices"][0]["message"]["content"]
+                else:
+                    logger.warning(f"Groq returned {response.status_code}, falling back to Gemini")
+        except Exception as e:
+            logger.warning(f"Groq failed: {e}, falling back to Gemini")
 
-                if "choices" not in data or not data["choices"]:
-                    raise ValueError(f"Unexpected API response structure: {data}")
-
-                return data["choices"][0]["message"]["content"]
-        except (httpx.HTTPStatusError, httpx.RequestError, ValueError, KeyError, IndexError) as e:
-            last_error = e
-            logger.warning(f"LLM call attempt {attempt + 1} failed: {e}")
-            if attempt < MAX_RETRIES:
-                await asyncio.sleep(2 * (attempt + 1))
+    # Fallback: Gemini
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    if gemini_key:
+        for attempt in range(MAX_RETRIES + 1):
+            try:
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    response = await client.post(
+                        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}",
+                        headers={"Content-Type": "application/json"},
+                        json={
+                            "contents": [{"parts": [{"text": f"System: {system_prompt}\n\nUser: {user_prompt}"}]}],
+                            "generationConfig": {"maxOutputTokens": 4096, "temperature": 0.2},
+                        },
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+                    text = data["candidates"][0]["content"]["parts"][0]["text"]
+                    return text
+            except Exception as e:
+                logger.warning(f"Gemini attempt {attempt + 1} failed: {e}")
+                if attempt < MAX_RETRIES:
+                    await asyncio.sleep(1 * (attempt + 1))
 
     raise HTTPException(status_code=502, detail="The verification pipeline is temporarily unavailable. Please try again.")
 
@@ -377,7 +394,7 @@ async def research_agent(topic: str, api_key: str, search_results: list[dict] | 
     prompt = f'''Analyze the topic: "{safe_topic}"
 {search_context}
 
-Extract 6-10 key factual claims. For each, provide:
+Extract 4-6 key factual claims. For each, provide:
 - claim: the factual statement (be specific, avoid vague claims)
 - source: primary source reference (publication, organization, or research institution)
 - source_url: URL of the source if available (from search results)
