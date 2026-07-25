@@ -193,29 +193,31 @@ def parse_agent_json(raw: str, agent_name: str) -> list | dict:
 
 # --- Web Search (GUARANTEED — no paid API required) ---
 
-def _ddg_search(query: str, max_results: int = 5) -> list[dict]:
-    """Single DuckDuckGo search attempt."""
+def _ddg_search_sync(query: str, max_results: int = 5) -> list[dict]:
+    """Single DuckDuckGo search attempt (sync, runs in thread)."""
     try:
-        with DDGS() as ddgs:
-            results = list(ddgs.text(query, max_results=max_results))
-            return [
-                {
-                    "title": r.get("title", ""),
-                    "url": r.get("href", ""),
-                    "content": r.get("body", ""),
-                    "score": 0.5,
-                }
-                for r in results
-            ]
+        ddgs = DDGS(timeout=10)
+        results = list(ddgs.text(query, max_results=max_results))
+        return [
+            {
+                "title": r.get("title", ""),
+                "url": r.get("href", ""),
+                "content": r.get("body", ""),
+                "score": 0.5,
+            }
+            for r in results
+        ]
     except Exception as e:
         logger.warning(f"DuckDuckGo search error: {e}")
         return []
 
 
-def duckduckgo_search(query: str, max_results: int = 5) -> list[dict]:
+async def duckduckgo_search(query: str, max_results: int = 5) -> list[dict]:
     """DuckDuckGo with retry logic and query variations. Always returns results."""
+    loop = asyncio.get_event_loop()
+
     # Attempt 1: exact query
-    results = _ddg_search(query, max_results)
+    results = await loop.run_in_executor(None, _ddg_search_sync, query, max_results)
     if results:
         return results
 
@@ -223,7 +225,7 @@ def duckduckgo_search(query: str, max_results: int = 5) -> list[dict]:
     simple = re.sub(r'[^\w\s]', '', query).strip()[:100]
     if simple != query:
         logger.info(f"DuckDuckGo retry with simplified query: '{simple[:50]}'")
-        results = _ddg_search(simple, max_results)
+        results = await loop.run_in_executor(None, _ddg_search_sync, simple, max_results)
         if results:
             return results
 
@@ -232,7 +234,7 @@ def duckduckgo_search(query: str, max_results: int = 5) -> list[dict]:
     short = " ".join(words)
     if short != query and short != simple:
         logger.info(f"DuckDuckGo retry with short query: '{short}'")
-        results = _ddg_search(short, max_results)
+        results = await loop.run_in_executor(None, _ddg_search_sync, short, max_results)
         if results:
             return results
 
@@ -273,7 +275,7 @@ async def brave_search(query: str, max_results: int = 5) -> list[dict]:
 async def web_search(query: str, max_results: int = 5) -> list[dict]:
     """Guaranteed web search. DuckDuckGo (always free, no key) + Brave (optional, better quality)."""
     # Try DuckDuckGo first (always works, no API key)
-    results = duckduckgo_search(query, max_results)
+    results = await duckduckgo_search(query, max_results)
     if results:
         logger.info(f"Search OK (DuckDuckGo): {len(results)} results for '{query[:50]}'")
         return results
