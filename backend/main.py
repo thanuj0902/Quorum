@@ -577,21 +577,15 @@ async def run_pipeline(topic: str, api_key: str):
     pipeline_log.append(log1)
     yield {"event": "agent_complete", "data": json.dumps(log1)}
 
-    await asyncio.sleep(1)
-
     # Step 2: Verify
     verified, log2 = await verifier_agent(claims, topic, api_key, search_results)
     pipeline_log.append(log2)
     yield {"event": "agent_complete", "data": json.dumps(log2)}
 
-    await asyncio.sleep(1)
-
     # Step 3: Contradiction detection
     flags, log3 = await contradiction_agent(verified, topic, api_key)
     pipeline_log.append(log3)
     yield {"event": "agent_complete", "data": json.dumps(log3)}
-
-    await asyncio.sleep(1)
 
     # Step 4: Calculate algorithmic confidence for each claim
     for claim in verified:
