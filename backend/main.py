@@ -18,7 +18,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("quorum")
 
-app = FastAPI(title="Quorum", version="2.2.0", description="Multi-agent AI fact-verification system")
+app = FastAPI(title="Quorum", version="2.3.0", description="Multi-agent AI fact-verification system")
 
 MAX_TOPIC_LENGTH = 500
 MAX_RETRIES = 2
@@ -118,17 +118,16 @@ def clean_json(text: str) -> str:
 
 
 async def call_llm(system_prompt: str, user_prompt: str, api_key: str) -> str:
-    # Try Groq first (fastest)
+    errors = []
+
+    # Provider 1: Groq (fastest)
     groq_key = os.getenv("GROQ_API_KEY")
     if groq_key:
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(
                     "https://api.groq.com/openai/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {groq_key}",
-                        "Content-Type": "application/json",
-                    },
+                    headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
                     json={
                         "model": "llama-3.1-8b-instant",
                         "max_tokens": 4096,
@@ -139,41 +138,48 @@ async def call_llm(system_prompt: str, user_prompt: str, api_key: str) -> str:
                         ],
                     },
                 )
-                if response.status_code == 429:
-                    logger.warning("Groq rate limited, falling back to Gemini")
-                elif response.status_code == 200:
+                if response.status_code == 200:
                     data = response.json()
                     if "choices" in data and data["choices"]:
                         return data["choices"][0]["message"]["content"]
+                elif response.status_code == 429:
+                    errors.append("Groq: rate limited")
+                    logger.warning("Groq rate limited")
                 else:
-                    logger.warning(f"Groq returned {response.status_code}, falling back to Gemini")
+                    errors.append(f"Groq: HTTP {response.status_code}")
+                    logger.warning(f"Groq returned {response.status_code}: {response.text[:200]}")
         except Exception as e:
-            logger.warning(f"Groq failed: {e}, falling back to Gemini")
+            errors.append(f"Groq: {e}")
+            logger.warning(f"Groq failed: {e}")
 
-    # Fallback: Gemini
+    # Provider 2: Gemini (fallback)
     gemini_key = os.getenv("GEMINI_API_KEY")
     if gemini_key:
-        for attempt in range(MAX_RETRIES + 1):
+        for attempt in range(2):
             try:
                 async with httpx.AsyncClient(timeout=60.0) as client:
                     response = await client.post(
-                        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}",
+                        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={gemini_key}",
                         headers={"Content-Type": "application/json"},
                         json={
-                            "contents": [{"parts": [{"text": f"System: {system_prompt}\n\nUser: {user_prompt}"}]}],
+                            "contents": [{"parts": [{"text": f"{system_prompt}\n\n{user_prompt}"}]}],
                             "generationConfig": {"maxOutputTokens": 4096, "temperature": 0.2},
                         },
                     )
-                    response.raise_for_status()
-                    data = response.json()
-                    text = data["candidates"][0]["content"]["parts"][0]["text"]
-                    return text
+                    if response.status_code == 200:
+                        data = response.json()
+                        text = data["candidates"][0]["content"]["parts"][0]["text"]
+                        return text
+                    else:
+                        errors.append(f"Gemini: HTTP {response.status_code}")
+                        logger.warning(f"Gemini returned {response.status_code}: {response.text[:200]}")
             except Exception as e:
-                logger.warning(f"Gemini attempt {attempt + 1} failed: {e}")
-                if attempt < MAX_RETRIES:
-                    await asyncio.sleep(1 * (attempt + 1))
+                errors.append(f"Gemini attempt {attempt + 1}: {e}")
+                logger.warning(f"Gemini failed: {e}")
+                await asyncio.sleep(1)
 
-    raise HTTPException(status_code=502, detail="The verification pipeline is temporarily unavailable. Please try again.")
+    logger.error(f"All providers failed: {errors}")
+    raise HTTPException(status_code=502, detail=f"Providers failed: {'; '.join(errors)}")
 
 
 def parse_agent_json(raw: str, agent_name: str) -> list | dict:
@@ -738,7 +744,7 @@ async def startup_check():
     if not api_key:
         logger.error("GROQ_API_KEY not set — pipeline will fail")
     else:
-        logger.info("Anthropic API key configured")
+        logger.info("Groq API key configured")
     if brave_key:
         logger.info("Brave Search API configured (primary search)")
     else:
@@ -749,14 +755,60 @@ async def startup_check():
 async def health():
     api_key = os.getenv("GROQ_API_KEY")
     brave_key = os.getenv("BRAVE_API_KEY")
+    gemini_key = os.getenv("GEMINI_API_KEY")
     return {
         "status": "ok",
         "service": "Quorum",
-        "version": "2.2.0",
+        "version": "2.3.0",
+        "providers": {
+            "groq": bool(api_key),
+            "gemini": bool(gemini_key),
+        },
         "api_key_configured": bool(api_key),
         "search_provider": "brave" if brave_key else "duckduckgo",
         "pipeline_agents": ["researcher", "verifier", "contradiction", "synthesizer"],
     }
+
+
+@app.get("/api/test-llm")
+async def test_llm():
+    groq_key = os.getenv("GROQ_API_KEY")
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    results = {}
+
+    if groq_key:
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+                    json={"model": "llama-3.1-8b-instant", "max_tokens": 50, "messages": [{"role": "user", "content": "Say OK"}]},
+                )
+                results["groq"] = {"status": resp.status_code, "ok": resp.status_code == 200}
+                if resp.status_code != 200:
+                    results["groq"]["error"] = resp.text[:300]
+        except Exception as e:
+            results["groq"] = {"status": "error", "error": str(e)[:300]}
+    else:
+        results["groq"] = {"status": "no_key"}
+
+    if gemini_key:
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={gemini_key}",
+                    headers={"Content-Type": "application/json"},
+                    json={"contents": [{"parts": [{"text": "Say OK"}]}], "generationConfig": {"maxOutputTokens": 50}},
+                )
+                results["gemini"] = {"status": resp.status_code, "ok": resp.status_code == 200}
+                if resp.status_code != 200:
+                    results["gemini"]["error"] = resp.text[:300]
+        except Exception as e:
+            results["gemini"] = {"status": "error", "error": str(e)[:300]}
+    else:
+        results["gemini"] = {"status": "no_key"}
+
+    return results
 
 
 if __name__ == "__main__":
