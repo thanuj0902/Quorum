@@ -1,24 +1,15 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "cleanUrls": true,
-  "rewrites": [
-    {
-      "source": "/api/((?!og).*)",
-      "destination": "https://quorum-lbh4.onrender.com/api/$1"
-    },
-    {
-      "source": "/privacy",
-      "destination": "/privacy.html"
-    },
-    {
-      "source": "/terms",
-      "destination": "/terms.html"
-    },
-    {
-      "source": "/((?!api/|privacy|terms).*)",
-      "destination": "/index.html"
-    }
+  "routes": [
+    { "src": "^/api/og$", "dest": "/api/og.tsx" },
+    { "src": "^/api/(?!og)(.*)$", "dest": "https://quorum-lbh4.onrender.com/api/$1" },
+    { "src": "^/privacy$", "headers": { "Content-Type": "text/html" }, "dest": "/privacy.html" },
+    { "src": "^/terms$", "headers": { "Content-Type": "text/html" }, "dest": "/terms.html" },
+    { "src": "^/manifest\\.json$", "headers": { "Content-Type": "application/manifest+json" }, "dest": "/manifest.json" },
+    { "src": "^/robots\\.txt$", "headers": { "Content-Type": "text/plain" }, "dest": "/robots.txt" },
+    { "src": "^/sitemap\\.xml$", "headers": { "Content-Type": "application/xml" }, "dest": "/sitemap.xml" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ],
   "headers": [
     {
@@ -36,20 +27,13 @@
     {
       "source": "/api/og",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800" },
-        { "key": "Content-Type", "value": "image/png" }
+        { "key": "Cache-Control", "value": "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800" }
       ]
     },
     {
       "source": "/assets/(.*)",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
-      ]
-    },
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
       ]
     }
   ]
