@@ -29,7 +29,7 @@ const dots = Array.from({ length: 20 }, (_, i) => ({
 
 export default function Hero({ onStart }: HeroProps) {
   return (
-    <section className="relative min-h-screen flex flex-col items-center justify-center px-6 overflow-hidden">
+    <section className="relative min-h-screen flex flex-col items-center justify-center px-6 overflow-hidden" aria-labelledby="hero-heading">
       {/* Animated gradient orbs */}
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
         <motion.div
@@ -107,24 +107,32 @@ export default function Hero({ onStart }: HeroProps) {
           </span>
         </motion.div>
 
-        {/* Headline */}
+        {/* Headline — proper H1 with keyword */}
         <motion.h1
+          id="hero-heading"
           variants={fadeUp}
           className="font-display text-[2.75rem] md:text-[4.5rem] font-bold tracking-[-0.03em] leading-[1.05] mb-7"
         >
-          Every claim, sourced.
+          AI Fact-Verification
           <br />
           <span className="bg-gradient-to-r from-accent via-purple-400 to-green bg-[length:200%_auto] animate-[gradient_6s_ease_infinite] bg-clip-text text-transparent">
-            Every score, explainable.
+            Built on Trust, Not Guesswork
           </span>
         </motion.h1>
 
-        {/* Subheadline */}
+        {/* Subheadline with descriptive text content */}
         <motion.p
           variants={fadeUp}
-          className="text-text-secondary text-lg md:text-xl max-w-lg mx-auto mb-12 leading-relaxed"
+          className="text-text-secondary text-lg md:text-xl max-w-lg mx-auto mb-6 leading-relaxed"
         >
-          Four AI agents research, cross-verify, and fact-check any topic — then show their work.
+          Quorum uses four independent AI agents to research, cross-verify, detect hallucinations, and compile citation-backed fact-check reports. Every claim sourced, every score explainable.
+        </motion.p>
+
+        <motion.p
+          variants={fadeUp}
+          className="text-text-secondary/60 text-sm max-w-md mx-auto mb-12 leading-relaxed"
+        >
+          Built for researchers, journalists, and anyone who needs to verify claims with evidence. Supports batch verification, shareable reports, and PDF export.
         </motion.p>
 
         {/* CTA */}
@@ -134,10 +142,10 @@ export default function Hero({ onStart }: HeroProps) {
             whileTap={{ scale: 0.97 }}
             onClick={onStart}
             className="group relative inline-flex items-center gap-3 px-9 py-4.5 bg-accent text-white font-semibold rounded-2xl transition-all duration-300 shadow-xl shadow-accent/25 hover:shadow-accent/40 focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base overflow-hidden"
-            aria-label="Watch the multi-agent pipeline verify a claim"
+            aria-label="Start verifying a claim with Quorum's multi-agent pipeline"
           >
             <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-700" />
-            <span className="relative">Watch it verify a claim</span>
+            <span className="relative">Start Fact-Checking</span>
             <ArrowRight className="w-4 h-4 relative transition-transform duration-300 group-hover:translate-x-1" aria-hidden="true" />
           </motion.button>
         </motion.div>

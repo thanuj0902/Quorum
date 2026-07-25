@@ -34,9 +34,15 @@ export default function LandingView({ onStart, onHistory }: LandingViewProps) {
 
       <main>
         <Hero onStart={onStart} />
-        <HowItWorks />
-        <WhyDifferent />
-        <Metrics />
+        <div id="how-it-works">
+          <HowItWorks />
+        </div>
+        <div id="why-different">
+          <WhyDifferent />
+        </div>
+        <div id="features">
+          <Metrics />
+        </div>
       </main>
 
       <LandingFooter />

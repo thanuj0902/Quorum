@@ -9,10 +9,10 @@ interface Step {
 }
 
 const steps: Step[] = [
-  { icon: Search, label: 'Research', desc: 'Extracts claims from multiple sources', color: 'accent' },
-  { icon: ShieldCheck, label: 'Verify', desc: 'Cross-checks each claim independently', color: 'green' },
-  { icon: AlertTriangle, label: 'Detect', desc: 'Flags conflicts & hallucinations', color: 'orange' },
-  { icon: FileText, label: 'Synthesize', desc: 'Citation-backed report with scores', color: 'accent' },
+  { icon: Search, label: 'Research', desc: 'Extracts factual claims from multiple sources with citations and initial confidence scores', color: 'accent' },
+  { icon: ShieldCheck, label: 'Verify', desc: 'Independently cross-references each claim against reliable sources and adjusts confidence', color: 'green' },
+  { icon: AlertTriangle, label: 'Detect', desc: 'Finds contradictions between claims and flags potential hallucinations or fabricated data', color: 'orange' },
+  { icon: FileText, label: 'Synthesize', desc: 'Compiles a citation-backed report with per-claim confidence scores and executive summary', color: 'accent' },
 ]
 
 const colorMap = {
@@ -23,7 +23,7 @@ const colorMap = {
 
 export default function HowItWorks() {
   return (
-    <section className="py-24 px-6" aria-labelledby="how-it-works-heading">
+    <section id="how-it-works" className="py-24 px-6" aria-labelledby="how-it-works-heading">
       <div className="max-w-5xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -33,7 +33,10 @@ export default function HowItWorks() {
           className="text-center mb-16"
         >
           <p className="text-accent text-xs font-semibold uppercase tracking-[0.2em] mb-4">Process</p>
-          <h2 id="how-it-works-heading" className="font-display text-3xl md:text-[2.5rem] font-bold tracking-tight">How it works</h2>
+          <h2 id="how-it-works-heading" className="font-display text-3xl md:text-[2.5rem] font-bold tracking-tight">How Quorum Works</h2>
+          <p className="text-text-secondary text-sm mt-3 max-w-lg mx-auto">
+            Each verification runs through four specialized AI agents in sequence. Every agent works independently, ensuring no single point of failure in the fact-checking process.
+          </p>
         </motion.div>
 
         <div className="relative">
@@ -53,10 +56,8 @@ export default function HowItWorks() {
                   className="relative group"
                 >
                   <div className="text-center">
-                    {/* Step number + icon */}
                     <div className="relative inline-flex mb-5">
-                      <div className={`w-16 h-16 rounded-2xl ${c.bg} border ${c.border} ${c.hover} flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg`}
-                      >
+                      <div className={`w-16 h-16 rounded-2xl ${c.bg} border ${c.border} ${c.hover} flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg`}>
                         <step.icon className={`w-6 h-6 ${c.text}`} strokeWidth={1.5} />
                       </div>
                       <span className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-base border border-border text-[10px] text-text-secondary font-mono flex items-center justify-center">

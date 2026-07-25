@@ -13,21 +13,21 @@ const points: Point[] = [
   {
     icon: Users,
     title: 'Four agents, not one',
-    desc: 'Four models cross-checking each other for accuracy — not a single AI guessing.',
+    desc: 'Four independent AI models cross-check each other for accuracy — not a single AI guessing at the truth.',
     stat: '4x',
     statLabel: 'verification',
   },
   {
     icon: Eye,
     title: 'Full transparency',
-    desc: 'Every claim sourced. Every score backed by evidence you can trace.',
+    desc: 'Every claim is sourced. Every confidence score is backed by evidence you can trace back to its origin.',
     stat: '100%',
     statLabel: 'explainable',
   },
   {
     icon: Zap,
-    title: 'Live disagreement',
-    desc: 'Agents disagree in real time — you see the real verification process.',
+    title: 'Real-time detection',
+    desc: 'Agents disagree in real time, flagging conflicts and hallucinations as they are discovered during verification.',
     stat: 'Real-time',
     statLabel: 'detection',
   },
@@ -35,7 +35,7 @@ const points: Point[] = [
 
 export default function WhyDifferent() {
   return (
-    <section className="py-24 px-6" aria-labelledby="why-different-heading">
+    <section id="why-different" className="py-24 px-6" aria-labelledby="why-different-heading">
       <div className="max-w-4xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -45,7 +45,10 @@ export default function WhyDifferent() {
           className="text-center mb-14"
         >
           <p className="text-accent text-xs font-semibold uppercase tracking-[0.2em] mb-4">Why different</p>
-          <h2 id="why-different-heading" className="font-display text-3xl md:text-[2.5rem] font-bold tracking-tight">Built for trust, not speed</h2>
+          <h2 id="why-different-heading" className="font-display text-3xl md:text-[2.5rem] font-bold tracking-tight">Built for Trust, Not Speed</h2>
+          <p className="text-text-secondary text-sm mt-3 max-w-md mx-auto">
+            Traditional fact-checkers use a single AI model. Quorum uses four independent agents that cross-verify each other, producing more reliable results.
+          </p>
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -58,7 +61,6 @@ export default function WhyDifferent() {
               transition={{ duration: 0.5, delay: i * 0.1 }}
               className="group relative p-6 bg-surface border border-border rounded-2xl hover:border-accent/20 transition-all duration-500 overflow-hidden"
             >
-              {/* Subtle gradient on hover */}
               <div className="absolute inset-0 bg-gradient-to-b from-accent/[0.04] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" aria-hidden="true" />
 
               <div className="relative">
