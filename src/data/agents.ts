@@ -1,6 +1,8 @@
-export const AGENT_IDS = ['researcher', 'verifier', 'contradiction', 'synthesizer']
+import type { Agent, AgentId } from '../types'
 
-export const AGENTS = [
+export const AGENT_IDS: AgentId[] = ['researcher', 'verifier', 'contradiction', 'synthesizer']
+
+export const AGENTS: Agent[] = [
   {
     id: 'researcher',
     label: 'Researcher',
@@ -31,7 +33,9 @@ export const AGENTS = [
   },
 ]
 
-export const AGENT_MAP = Object.fromEntries(AGENTS.map(a => [a.id, a]))
+export const AGENT_MAP: Record<AgentId, Agent> = Object.fromEntries(
+  AGENTS.map(a => [a.id, a])
+) as Record<AgentId, Agent>
 
 export const PIPELINE_TIMING = {
   INIT_DELAY: 800,
@@ -45,4 +49,4 @@ export const PIPELINE_TIMING = {
   PREVIEW_LOG_INTERVAL: 2200,
   PREVIEW_RESET_DELAY: 2000,
   DEMO_START_DELAY: 500,
-}
+} as const

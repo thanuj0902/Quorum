@@ -1,6 +1,11 @@
 import { memo } from 'react'
 
-function Logo({ onClick, className = '' }) {
+interface LogoProps {
+  onClick?: () => void
+  className?: string
+}
+
+function Logo({ onClick, className = '' }: LogoProps) {
   return (
     <button
       onClick={onClick}

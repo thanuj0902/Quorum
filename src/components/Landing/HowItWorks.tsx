@@ -1,7 +1,14 @@
 import { motion } from 'framer-motion'
-import { Search, ShieldCheck, AlertTriangle, FileText } from 'lucide-react'
+import { Search, ShieldCheck, AlertTriangle, FileText, type LucideIcon } from 'lucide-react'
 
-const steps = [
+interface Step {
+  icon: LucideIcon
+  label: string
+  desc: string
+  color: 'accent' | 'green' | 'orange'
+}
+
+const steps: Step[] = [
   { icon: Search, label: 'Research', desc: 'Extracts claims from multiple sources', color: 'accent' },
   { icon: ShieldCheck, label: 'Verify', desc: 'Cross-checks each claim independently', color: 'green' },
   { icon: AlertTriangle, label: 'Detect', desc: 'Flags conflicts & hallucinations', color: 'orange' },

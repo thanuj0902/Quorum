@@ -1,11 +1,13 @@
+import type { ConfidenceClasses } from '../types'
+
 export const CONFIDENCE_THRESHOLDS = {
   HIGH: 80,
   MEDIUM: 60,
   SOURCE_HIGH: 70,
   SOURCE_MEDIUM: 40,
-}
+} as const
 
-export function confidenceClasses(score) {
+export function confidenceClasses(score: number): ConfidenceClasses {
   if (score >= CONFIDENCE_THRESHOLDS.HIGH) {
     return { bg: 'bg-green-dim', text: 'text-green', border: 'border-green/20', gradient: 'from-green to-green/60' }
   }
@@ -15,7 +17,7 @@ export function confidenceClasses(score) {
   return { bg: 'bg-red-dim', text: 'text-red', border: 'border-red/20', gradient: 'from-red to-red/60' }
 }
 
-export function sourceTrustClass(trust) {
+export function sourceTrustClass(trust: number): string {
   if (trust >= CONFIDENCE_THRESHOLDS.SOURCE_HIGH) return 'text-green'
   if (trust >= CONFIDENCE_THRESHOLDS.SOURCE_MEDIUM) return 'text-yellow'
   return 'text-red'

@@ -1,15 +1,25 @@
 import { memo, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { AGENTS } from '../../data/agents'
+import type { Agent, AgentId, PipelineState } from '../../types'
 
-const AGENT_COLORS = {
+interface AgentNodeProps {
+  agent: Agent
+  index: number
+  isActive: boolean
+  isDone: boolean
+  message?: string
+  timer?: string
+}
+
+const AGENT_COLORS: Record<AgentId, { bg: string; border: string; text: string; glow: string; progress: string }> = {
   researcher: { bg: 'rgba(124,58,237,0.10)', border: 'rgba(124,58,237,0.25)', text: '#A78BFA', glow: 'rgba(124,58,237,0.3)', progress: '#7C3AED' },
   verifier: { bg: 'rgba(52,211,153,0.10)', border: 'rgba(52,211,153,0.25)', text: '#6EE7B7', glow: 'rgba(52,211,153,0.3)', progress: '#34D399' },
   contradiction: { bg: 'rgba(251,146,60,0.10)', border: 'rgba(251,146,60,0.25)', text: '#FDBA74', glow: 'rgba(251,146,60,0.3)', progress: '#FB923C' },
   synthesizer: { bg: 'rgba(124,58,237,0.10)', border: 'rgba(124,58,237,0.25)', text: '#A78BFA', glow: 'rgba(124,58,237,0.3)', progress: '#7C3AED' },
 }
 
-function AgentNode({ agent, index, isActive, isDone, message, timer }) {
+function AgentNode({ agent, index, isActive, isDone, message, timer }: AgentNodeProps) {
   const colors = useMemo(() => AGENT_COLORS[agent.id] || AGENT_COLORS.researcher, [agent.id])
 
   const statusText = isDone ? 'Complete' : isActive ? (message || 'Working...') : 'Waiting'
@@ -90,17 +100,21 @@ function AgentNode({ agent, index, isActive, isDone, message, timer }) {
   )
 }
 
-function PipelineVisualizer({ pipelineState }) {
+interface PipelineVisualizerProps {
+  pipelineState: PipelineState
+}
+
+function PipelineVisualizer({ pipelineState }: PipelineVisualizerProps) {
   const { activeAgent, completedAgents, agentMessages, agentTimers, currentLog } = pipelineState
 
   return (
     <div className="w-full" role="region" aria-label="Agent pipeline status">
       {/* Desktop: horizontal */}
       <div className="hidden md:grid grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] items-center gap-3" aria-label="Pipeline steps">
-        {AGENTS.map((agent, i) => {
+        {AGENTS.map((agent: Agent, i: number) => {
           const isActive = activeAgent === agent.id
           const isDone = completedAgents.includes(agent.id)
-          const isPast = completedAgents.indexOf(agent.id) < completedAgents.length - 1 || (completedAgents.length === AGENTS.length)
+
 
           return (
             <div key={agent.id} className="contents">
@@ -143,7 +157,7 @@ function PipelineVisualizer({ pipelineState }) {
 
       {/* Mobile: vertical */}
       <div className="md:hidden space-y-3" aria-label="Pipeline steps — vertical layout">
-        {AGENTS.map((agent, i) => (
+        {AGENTS.map((agent: Agent, i: number) => (
           <AgentNode
             key={agent.id}
             agent={agent}

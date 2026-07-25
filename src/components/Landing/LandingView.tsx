@@ -6,7 +6,11 @@ import WhyDifferent from './WhyDifferent'
 import Metrics from './Metrics'
 import LandingFooter from './LandingFooter'
 
-export default function LandingView({ onStart }) {
+interface LandingViewProps {
+  onStart: () => void
+}
+
+export default function LandingView({ onStart }: LandingViewProps) {
   return (
     <>
       <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4 bg-base/80 backdrop-blur-xl border-b border-border/50" role="navigation" aria-label="Main navigation">

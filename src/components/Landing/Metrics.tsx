@@ -1,7 +1,14 @@
 import { motion } from 'framer-motion'
-import { Cpu, Clock, Shield, Layers } from 'lucide-react'
+import { Cpu, Clock, Shield, Layers, type LucideIcon } from 'lucide-react'
 
-const metrics = [
+interface Metric {
+  icon: LucideIcon
+  value: string
+  label: string
+  desc: string
+}
+
+const metrics: Metric[] = [
   { icon: Cpu, value: '4', label: 'Independent AI Agents', desc: 'Each specializing in a verification task' },
   { icon: Clock, value: '<15s', label: 'Full Pipeline', desc: 'End-to-end claim verification' },
   { icon: Shield, value: '0', label: 'Fabricated Claims', desc: 'Hallucination detection built in' },

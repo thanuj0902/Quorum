@@ -1,7 +1,15 @@
 import { motion } from 'framer-motion'
-import { Users, Eye, Zap } from 'lucide-react'
+import { Users, Eye, Zap, type LucideIcon } from 'lucide-react'
 
-const points = [
+interface Point {
+  icon: LucideIcon
+  title: string
+  desc: string
+  stat: string
+  statLabel: string
+}
+
+const points: Point[] = [
   {
     icon: Users,
     title: 'Four agents, not one',

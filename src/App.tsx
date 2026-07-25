@@ -5,8 +5,9 @@ import LandingView from './components/Landing/LandingView'
 import PipelineView from './components/Pipeline/PipelineView'
 import { usePipeline } from './hooks/usePipeline'
 
+
 export default function App() {
-  const [view, setView] = useState('landing')
+  const [view, setView] = useState<'landing' | 'pipeline'>('landing')
   const { phase, pipelineState, report, error, runDemoPipeline, runLivePipeline } = usePipeline()
 
   const handleStart = () => {

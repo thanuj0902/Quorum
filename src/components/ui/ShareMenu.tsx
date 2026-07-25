@@ -1,11 +1,17 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Share2, Check, Link2, X } from 'lucide-react'
 
 const SHARE_URL = 'https://quorum-liart.vercel.app'
 const SHARE_TEXT = 'Four AI agents fact-check any topic — then show their work.'
 
-const socials = [
+interface Social {
+  name: string
+  href: string
+  icon: ReactNode
+}
+
+const socials: Social[] = [
   {
     name: 'WhatsApp',
     href: `https://wa.me/?text=${encodeURIComponent(SHARE_TEXT + ' ' + SHARE_URL)}`,
@@ -36,8 +42,8 @@ const socials = [
 ]
 
 export default function ShareMenu() {
-  const [open, setOpen] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [open, setOpen] = useState<boolean>(false)
+  const [copied, setCopied] = useState<boolean>(false)
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(SHARE_URL)

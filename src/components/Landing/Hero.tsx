@@ -1,7 +1,11 @@
-import { motion } from 'framer-motion'
+import { motion, type Variants } from 'framer-motion'
 import { ArrowRight } from 'lucide-react'
 
-const stagger = {
+interface HeroProps {
+  onStart: () => void
+}
+
+const stagger: Variants = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
@@ -9,9 +13,9 @@ const stagger = {
   },
 }
 
-const fadeUp = {
+const fadeUp: Variants = {
   hidden: { opacity: 0, y: 30 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] as const } },
 }
 
 const dots = Array.from({ length: 20 }, (_, i) => ({
@@ -23,7 +27,7 @@ const dots = Array.from({ length: 20 }, (_, i) => ({
   duration: Math.random() * 3 + 4,
 }))
 
-export default function Hero({ onStart }) {
+export default function Hero({ onStart }: HeroProps) {
   return (
     <section className="relative min-h-screen flex flex-col items-center justify-center px-6 overflow-hidden">
       {/* Animated gradient orbs */}

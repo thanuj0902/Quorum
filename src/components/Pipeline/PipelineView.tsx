@@ -4,9 +4,19 @@ import Logo from '../ui/Logo'
 import PipelineVisualizer from './PipelineVisualizer'
 import ConfidenceReport from '../Report/ConfidenceReport'
 import SourceTrustLedger from '../Report/SourceTrustLedger'
+import type { PipelinePhase, PipelineState, VerificationReport } from '../../types'
 
-export default function PipelineView({ phase, pipelineState, report, error, onBack, onAnalyze }) {
-  const [topic, setTopic] = useState('Impact of artificial intelligence on healthcare diagnostics')
+interface PipelineViewProps {
+  phase: PipelinePhase
+  pipelineState: PipelineState
+  report: VerificationReport | null
+  error: string | null
+  onBack: () => void
+  onAnalyze: (topic: string) => void
+}
+
+export default function PipelineView({ phase, pipelineState, report, error, onBack, onAnalyze }: PipelineViewProps) {
+  const [topic, setTopic] = useState<string>('Impact of artificial intelligence on healthcare diagnostics')
 
   const handleSubmit = useCallback(() => {
     const trimmed = topic.trim()

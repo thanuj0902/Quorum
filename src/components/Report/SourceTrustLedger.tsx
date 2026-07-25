@@ -1,13 +1,24 @@
 import { memo, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Database, TrendingUp, TrendingDown, Shield } from 'lucide-react'
-import { sourceTrustClass } from '../../utils/colors'
+import type { VerificationReport } from '../../types'
 
-function SourceTrustLedger({ report }) {
-  const sources = useMemo(() => {
+interface SourceEntry {
+  name: string
+  cited: number
+  supported: number
+  contradicted: number
+}
+
+interface SourceTrustLedgerProps {
+  report: VerificationReport
+}
+
+function SourceTrustLedger({ report }: SourceTrustLedgerProps) {
+  const sources = useMemo((): SourceEntry[] => {
     if (!report?.claims?.length) return []
 
-    const sourceMap = {}
+    const sourceMap: Record<string, SourceEntry> = {}
 
     report.claims.forEach(claim => {
       if (!sourceMap[claim.source]) {

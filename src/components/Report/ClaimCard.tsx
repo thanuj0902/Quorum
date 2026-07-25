@@ -1,30 +1,34 @@
-import { memo, useState } from 'react'
+import React, { memo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown, CheckCircle2, AlertTriangle, XCircle, ExternalLink } from 'lucide-react'
 import { confidenceClasses } from '../../utils/colors'
+import type { Claim } from '../../types'
 
-function statusIcon(status) {
+interface ClaimCardProps {
+  claim: Claim
+  index: number
+}
+
+function statusIcon(status: Claim['verification_status']): React.ReactNode {
   switch (status) {
     case 'verified': return <CheckCircle2 className="w-4 h-4 text-green" aria-hidden="true" />
     case 'partially_verified': return <AlertTriangle className="w-4 h-4 text-yellow" aria-hidden="true" />
     case 'unverified': return <XCircle className="w-4 h-4 text-text-secondary" aria-hidden="true" />
     case 'contradicted': return <XCircle className="w-4 h-4 text-red" aria-hidden="true" />
-    default: return null
   }
 }
 
-function statusLabel(status) {
+function statusLabel(status: Claim['verification_status']): { text: string; color: string; bg: string; border: string } {
   switch (status) {
     case 'verified': return { text: 'Verified', color: '#34D399', bg: 'rgba(52,211,153,0.08)', border: 'rgba(52,211,153,0.2)' }
     case 'partially_verified': return { text: 'Partial', color: '#FBBF24', bg: 'rgba(251,191,36,0.08)', border: 'rgba(251,191,36,0.2)' }
     case 'unverified': return { text: 'Unverified', color: '#7A7A95', bg: 'rgba(122,122,149,0.08)', border: 'rgba(122,122,149,0.2)' }
     case 'contradicted': return { text: 'Contradicted', color: '#F87171', bg: 'rgba(248,113,113,0.08)', border: 'rgba(248,113,113,0.2)' }
-    default: return { text: status?.replace(/_/g, ' ') || 'Unknown', color: '#7A7A95', bg: 'rgba(122,122,149,0.08)', border: 'rgba(122,122,149,0.2)' }
   }
 }
 
-function ClaimCard({ claim, index }) {
-  const [expanded, setExpanded] = useState(false)
+function ClaimCard({ claim, index }: ClaimCardProps) {
+  const [expanded, setExpanded] = useState<boolean>(false)
   if (!claim) return null
 
   const conf = confidenceClasses(Math.round((claim.confidence || 0) * 100))
@@ -125,7 +129,7 @@ function ClaimCard({ claim, index }) {
                     Supporting Sources
                   </p>
                   <ul className="space-y-1.5" role="list">
-                    {claim.supporting_sources.map((src, i) => (
+                    {claim.supporting_sources.map((src: string, i: number) => (
                       <li key={src || i} className="flex items-center gap-2.5 text-sm text-text-secondary px-3 py-2 rounded-lg" style={{ background: 'rgba(52,211,153,0.03)' }}>
                         <CheckCircle2 className="w-3.5 h-3.5 text-green/60 shrink-0" aria-hidden="true" />
                         <span className="truncate">{src}</span>
@@ -141,7 +145,7 @@ function ClaimCard({ claim, index }) {
                     Contradicting Sources
                   </p>
                   <ul className="space-y-1.5" role="list">
-                    {claim.contradicting_sources.map((src, i) => (
+                    {claim.contradicting_sources.map((src: string, i: number) => (
                       <li key={src || i} className="flex items-center gap-2.5 text-sm text-text-secondary px-3 py-2 rounded-lg" style={{ background: 'rgba(248,113,113,0.03)' }}>
                         <XCircle className="w-3.5 h-3.5 text-red/60 shrink-0" aria-hidden="true" />
                         <span className="truncate">{src}</span>

@@ -1,20 +1,30 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { AGENT_IDS, AGENT_MAP, PIPELINE_TIMING } from '../data/agents'
 import { demoReport, demoPipelineMessages } from '../data/demoData'
+import type { PipelineState, PipelinePhase, VerificationReport } from '../types'
 
-export function usePipeline() {
-  const [phase, setPhase] = useState('idle')
-  const [pipelineState, setPipelineState] = useState({
+interface UsePipelineReturn {
+  phase: PipelinePhase
+  pipelineState: PipelineState
+  report: VerificationReport | null
+  error: string | null
+  runDemoPipeline: () => Promise<void>
+  runLivePipeline: (topic: string) => Promise<void>
+}
+
+export function usePipeline(): UsePipelineReturn {
+  const [phase, setPhase] = useState<PipelinePhase>('idle')
+  const [pipelineState, setPipelineState] = useState<PipelineState>({
     activeAgent: null,
     completedAgents: [],
     agentMessages: {},
     agentTimers: {},
     currentLog: '',
   })
-  const [report, setReport] = useState(null)
-  const [error, setError] = useState(null)
+  const [report, setReport] = useState<VerificationReport | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  const updateState = useCallback((updates) => {
+  const updateState = useCallback((updates: Partial<PipelineState>) => {
     setPipelineState(prev => ({ ...prev, ...updates }))
   }, [])
 
@@ -30,7 +40,7 @@ export function usePipeline() {
     })
   }, [])
 
-  const runDemoPipeline = useCallback(async () => {
+  const runDemoPipeline = useCallback(async (): Promise<void> => {
     resetPipeline()
     setPhase('running')
 
@@ -75,7 +85,7 @@ export function usePipeline() {
     setPhase('complete')
   }, [updateState, resetPipeline])
 
-  const runLivePipeline = useCallback(async (topic) => {
+  const runLivePipeline = useCallback(async (topic: string): Promise<void> => {
     resetPipeline()
     setPhase('running')
     updateState({ currentLog: 'Connecting to multi-agent backend...' })
@@ -120,7 +130,8 @@ export function usePipeline() {
       setReport(data.report)
       setPhase('complete')
     } catch (err) {
-      setError(`Backend unavailable: ${err.message}. Falling back to demo.`)
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setError(`Backend unavailable: ${message}. Falling back to demo.`)
       updateState({ currentLog: 'Backend unavailable — running demo mode' })
       await delay(PIPELINE_TIMING.FALLBACK_DELAY)
       runDemoPipeline()
@@ -137,6 +148,6 @@ export function usePipeline() {
   }
 }
 
-function delay(ms) {
+function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }

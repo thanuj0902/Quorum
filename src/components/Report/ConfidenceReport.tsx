@@ -3,12 +3,17 @@ import { motion } from 'framer-motion'
 import { confidenceClasses } from '../../utils/colors'
 import ClaimCard from './ClaimCard'
 import { TrendingUp, CheckCircle2, AlertTriangle, XCircle, ShieldCheck } from 'lucide-react'
+import type { VerificationReport } from '../../types'
 
-function AnimatedNumber({ value, duration = 1200 }) {
-  const [display, setDisplay] = useState(0)
+interface AnimatedNumberProps {
+  value: number
+  duration?: number
+}
+
+function AnimatedNumber({ value, duration = 1200 }: AnimatedNumberProps) {
+  const [display, setDisplay] = useState<number>(0)
 
   useEffect(() => {
-    let start = 0
     const startTime = Date.now()
     const tick = () => {
       const elapsed = Date.now() - startTime
@@ -23,7 +28,11 @@ function AnimatedNumber({ value, duration = 1200 }) {
   return <span>{display}</span>
 }
 
-function ConfidenceReport({ report }) {
+interface ConfidenceReportProps {
+  report: VerificationReport
+}
+
+function ConfidenceReport({ report }: ConfidenceReportProps) {
   if (!report) return null
 
   const overallScore = Math.round((report.overall_confidence || 0) * 100)

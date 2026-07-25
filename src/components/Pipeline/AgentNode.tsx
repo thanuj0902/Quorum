@@ -1,14 +1,24 @@
 import { memo, useMemo } from 'react'
 import { motion } from 'framer-motion'
+import type { Agent, AgentId } from '../../types'
 
-const AGENT_COLORS = {
+interface AgentNodeProps {
+  agent: Agent
+  index: number
+  isActive: boolean
+  isDone: boolean
+  message?: string
+  timer?: string
+}
+
+const AGENT_COLORS: Record<AgentId, { bg: string; border: string; text: string; glow: string }> = {
   researcher: { bg: 'bg-accent/10', border: 'border-accent/20', text: 'text-accent', glow: 'shadow-accent/10' },
   verifier: { bg: 'bg-green/10', border: 'border-green/20', text: 'text-green', glow: 'shadow-green/10' },
   contradiction: { bg: 'bg-orange/10', border: 'border-orange/20', text: 'text-orange', glow: 'shadow-orange/10' },
   synthesizer: { bg: 'bg-accent/10', border: 'border-accent/20', text: 'text-accent', glow: 'shadow-accent/10' },
 }
 
-function AgentNode({ agent, index, isActive, isDone, message, timer }) {
+function AgentNode({ agent, index, isActive, isDone, message, timer }: AgentNodeProps) {
   const colors = useMemo(() => AGENT_COLORS[agent.id] || AGENT_COLORS.researcher, [agent.id])
 
   const statusText = isDone ? 'Complete' : isActive ? (message || 'Working...') : 'Waiting'

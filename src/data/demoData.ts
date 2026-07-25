@@ -1,4 +1,6 @@
-export const demoReport = {
+import type { VerificationReport, AgentId } from '../types'
+
+export const demoReport: VerificationReport = {
   topic: 'Impact of artificial intelligence on healthcare diagnostics',
   overall_confidence: 0.84,
   summary: 'Research on AI in healthcare diagnostics reveals strong evidence of transformative impact. AI diagnostic tools have achieved radiologist-level accuracy in specific domains (94.5% in breast cancer detection per Nature Medicine 2024). The global AI healthcare market is projected to reach $187.95B by 2030. However, claims about AI mental health chatbots show more variation — JAMA Psychiatry findings are partially contested by APA position statements. IBM Watson for Oncology\'s performance figures remain disputed across sources.',
@@ -112,7 +114,7 @@ export const demoReport = {
   ],
 }
 
-export const demoPipelineMessages = {
+export const demoPipelineMessages: Record<AgentId, string[]> = {
   researcher: [
     'Scanning Nature Medicine for diagnostic accuracy data...',
     'Extracting claim: 94.5% breast cancer detection accuracy',
