@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import Logo from './components/ui/Logo'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import LandingView from './components/Landing/LandingView'
 import PipelineView from './components/Pipeline/PipelineView'

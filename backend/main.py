@@ -16,7 +16,7 @@ logger = logging.getLogger("factcheck")
 
 app = FastAPI(title="FactCheck AI", version="2.0.0")
 
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000,https://quorum-liart.vercel.app").split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
