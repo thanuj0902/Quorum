@@ -56,17 +56,6 @@ export default function HowItWorks() {
                     {/* Step number + icon */}
                     <div className="relative inline-flex mb-5">
                       <div className={`w-16 h-16 rounded-2xl ${c.bg} border ${c.border} ${c.hover} flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg`}
-                        style={{ boxShadow: 'none' }}
-                        ref={(el) => {
-                          if (el) {
-                            el.addEventListener('mouseenter', () => {
-                              el.style.boxShadow = `0 0 30px ${step.color === 'accent' ? 'rgba(124,58,237,0.2)' : step.color === 'green' ? 'rgba(52,211,153,0.2)' : 'rgba(251,146,60,0.2)'}`
-                            })
-                            el.addEventListener('mouseleave', () => {
-                              el.style.boxShadow = 'none'
-                            })
-                          }
-                        }}
                       >
                         <step.icon className={`w-6 h-6 ${c.text}`} strokeWidth={1.5} />
                       </div>

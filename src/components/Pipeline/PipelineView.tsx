@@ -1,9 +1,11 @@
 import { useState, useCallback } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { Save, FileDown, Share2, History } from 'lucide-react'
 import Logo from '../ui/Logo'
 import PipelineVisualizer from './PipelineVisualizer'
 import ConfidenceReport from '../Report/ConfidenceReport'
 import SourceTrustLedger from '../Report/SourceTrustLedger'
+import { exportReportAsPDF } from '../../utils/pdf'
 import type { PipelinePhase, PipelineState, VerificationReport } from '../../types'
 
 interface PipelineViewProps {
@@ -13,9 +15,11 @@ interface PipelineViewProps {
   error: string | null
   onBack: () => void
   onAnalyze: (topic: string) => void
+  onSaveReport: () => void
+  onViewHistory: () => void
 }
 
-export default function PipelineView({ phase, pipelineState, report, error, onBack, onAnalyze }: PipelineViewProps) {
+export default function PipelineView({ phase, pipelineState, report, error, onBack, onAnalyze, onSaveReport, onViewHistory }: PipelineViewProps) {
   const [topic, setTopic] = useState<string>('Impact of artificial intelligence on healthcare diagnostics')
 
   const handleSubmit = useCallback(() => {
@@ -53,6 +57,52 @@ export default function PipelineView({ phase, pipelineState, report, error, onBa
           </div>
         </div>
       </nav>
+
+      {phase === 'complete' && report && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="border-b border-border/50"
+          style={{ background: '#111114' }}
+        >
+          <div className="max-w-5xl mx-auto px-6 py-3 flex items-center gap-2">
+            <button
+              onClick={onSaveReport}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-medium transition-all duration-200 hover:border-accent/30"
+              style={{ background: '#18181D', borderColor: '#222230', color: '#A78BFA' }}
+            >
+              <Save className="w-3.5 h-3.5" />
+              Save to History
+            </button>
+            <button
+              onClick={() => exportReportAsPDF(report)}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-medium transition-all duration-200 hover:border-accent/30"
+              style={{ background: '#18181D', borderColor: '#222230', color: '#34D399' }}
+            >
+              <FileDown className="w-3.5 h-3.5" />
+              Export PDF
+            </button>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(window.location.href)
+              }}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-medium transition-all duration-200 hover:border-accent/30"
+              style={{ background: '#18181D', borderColor: '#222230', color: '#FBBF24' }}
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              Share Link
+            </button>
+            <button
+              onClick={onViewHistory}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-medium transition-all duration-200 hover:border-accent/30"
+              style={{ background: '#18181D', borderColor: '#222230', color: '#A78BFA' }}
+            >
+              <History className="w-3.5 h-3.5" />
+              View History
+            </button>
+          </div>
+        </motion.div>
+      )}
 
       <main className="max-w-5xl mx-auto px-6 py-10 space-y-10">
         {/* Error banner */}

@@ -61,3 +61,35 @@ export interface ConfidenceClasses {
   border: string
   gradient: string
 }
+
+// Routing
+export type AppView = 'landing' | 'pipeline' | 'history' | 'report'
+
+// History
+export interface HistoryEntry {
+  id: string
+  topic: string
+  overall_confidence: number
+  summary: string
+  claims_count: number
+  verified_count: number
+  partial_count: number
+  flagged_count: number
+  timestamp: number
+  fullReport: VerificationReport
+}
+
+// Batch
+export interface BatchResult {
+  topic: string
+  report: VerificationReport | null
+  status: 'pending' | 'running' | 'complete' | 'error'
+  error?: string
+}
+
+// Toast
+export interface Toast {
+  id: string
+  message: string
+  type: 'success' | 'error' | 'info'
+}

@@ -134,7 +134,7 @@ export function usePipeline(): UsePipelineReturn {
       setError(`Backend unavailable: ${message}. Falling back to demo.`)
       updateState({ currentLog: 'Backend unavailable — running demo mode' })
       await delay(PIPELINE_TIMING.FALLBACK_DELAY)
-      runDemoPipeline()
+      await runDemoPipeline()
     }
   }, [updateState, resetPipeline, runDemoPipeline])
 
