@@ -133,12 +133,120 @@
   <body>
     <a href="#main-content" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0" onfocus="this.style.position='fixed';this.style.width='auto';this.style.height='auto';this.style.padding='12px 24px';this.style.margin='0';this.style.overflow='visible';this.style.clip='auto';this.style.white-space='normal';this.style.top='16px';this.style.left='16px';this.style.zIndex='999';this.style.background='#7c3aed';this.style.color='#fff';this.style.borderRadius='8px';this.style.fontSize='14px';this.style.fontWeight='600';this.style.textDecoration='none'">Skip to main content</a>
     <div id="root">
+      <div style="min-height:100vh;background:#0a0a0f;color:#f0f0f5;font-family:system-ui,sans-serif">
+        <nav style="position:fixed;top:0;left:0;right:0;z-index:50;padding:16px 24px;background:rgba(10,10,15,0.8);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,0.05)">
+          <div style="max-width:1152px;margin:0 auto;display:flex;align-items:center;justify-content:space-between">
+            <span style="font-weight:700;font-size:14px;letter-spacing:-0.02em">Quorum</span>
+          </div>
+        </nav>
+        <main id="main-content">
+          <section style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center">
+            <div style="display:inline-flex;align-items:center;gap:10px;padding:8px 16px;border-radius:100px;border:1px solid rgba(255,255,255,0.1);background:rgba(17,17,20,0.6);margin-bottom:40px;font-size:12px;color:rgba(255,255,255,0.6);letter-spacing:0.1em;text-transform:uppercase">Multi-Agent Pipeline</div>
+            <h1 style="font-size:clamp(2.75rem,7vw,4.5rem);font-weight:700;letter-spacing:-0.03em;line-height:1.05;margin-bottom:28px">
+              AI Fact-Verification<br>
+              <span style="background:linear-gradient(90deg,#7c3aed,#a78bfa,#34d399);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Built on Trust, Not Guesswork</span>
+            </h1>
+            <p style="color:rgba(255,255,255,0.6);font-size:1.1rem;max-width:576px;margin:0 auto 20px;line-height:1.6">
+              Quorum is a free multi-agent AI fact-verification system that uses four independent AI agents to research, cross-verify, detect hallucinations, and compile citation-backed verification reports. Every claim sourced, every score explainable.
+            </p>
+            <p style="color:rgba(255,255,255,0.35);font-size:0.875rem;max-width:512px;margin:0 auto 48px;line-height:1.6">
+              Built for journalists verifying breaking news, researchers validating citations, and anyone who needs to verify claims with evidence. Supports batch verification, shareable report links, and PDF export. No login required.
+            </p>
+            <a href="#start" style="display:inline-flex;align-items:center;gap:12px;padding:18px 36px;background:#7c3aed;color:#fff;font-weight:600;border-radius:16px;font-size:1rem;text-decoration:none">Start Fact-Checking →</a>
+          </section>
+          <section aria-labelledby="how-it-works-heading" style="padding:96px 24px">
+            <div style="max-width:1024px;margin:0 auto">
+              <p style="color:#7c3aed;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.2em;margin-bottom:16px;text-align:center">Process</p>
+              <h2 id="how-it-works-heading" style="font-size:clamp(1.875rem,4vw,2.5rem);font-weight:700;letter-spacing:-0.02em;text-align:center;margin-bottom:12px">How Quorum's Multi-Agent Verification Works</h2>
+              <p style="color:rgba(255,255,255,0.6);font-size:0.875rem;text-align:center;max-width:576px;margin:0 auto 64px">Each verification runs through four specialized AI agents in sequence. Every agent works independently, ensuring no single point of failure in the fact-checking process.</p>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px">
+                <div style="text-align:center;padding:24px">
+                  <div style="width:64px;height:64px;border-radius:16px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.15);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:24px">🔍</div>
+                  <h3 style="font-size:1rem;font-weight:600;margin-bottom:4px">Research Agent</h3>
+                  <p style="color:rgba(255,255,255,0.6);font-size:0.75rem;line-height:1.6">Extracts factual claims from your input and gathers sources with initial confidence scores.</p>
+                </div>
+                <div style="text-align:center;padding:24px">
+                  <div style="width:64px;height:64px;border-radius:16px;background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.15);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:24px">🛡️</div>
+                  <h3 style="font-size:1rem;font-weight:600;margin-bottom:4px">Verification Agent</h3>
+                  <p style="color:rgba(255,255,255,0.6);font-size:0.75rem;line-height:1.6">Independently cross-references each claim against reliable sources and adjusts confidence.</p>
+                </div>
+                <div style="text-align:center;padding:24px">
+                  <div style="width:64px;height:64px;border-radius:16px;background:rgba(251,146,60,0.08);border:1px solid rgba(251,146,60,0.15);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:24px">⚠️</div>
+                  <h3 style="font-size:1rem;font-weight:600;margin-bottom:4px">Hallucination Detector</h3>
+                  <p style="color:rgba(255,255,255,0.6);font-size:0.75rem;line-height:1.6">Finds contradictions and flags potential hallucinations or fabricated data.</p>
+                </div>
+                <div style="text-align:center;padding:24px">
+                  <div style="width:64px;height:64px;border-radius:16px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.15);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:24px">📄</div>
+                  <h3 style="font-size:1rem;font-weight:600;margin-bottom:4px">Synthesis Agent</h3>
+                  <p style="color:rgba(255,255,255,0.6);font-size:0.75rem;line-height:1.6">Compiles a citation-backed report with per-claim confidence scores and executive summary.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+          <section aria-labelledby="why-different-heading" style="padding:96px 24px">
+            <div style="max-width:768px;margin:0 auto">
+              <p style="color:#7c3aed;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.2em;margin-bottom:16px;text-align:center">Why different</p>
+              <h2 id="why-different-heading" style="font-size:clamp(1.875rem,4vw,2.5rem);font-weight:700;letter-spacing:-0.02em;text-align:center;margin-bottom:12px">Multi-Agent Verification vs Single-Model Fact-Checking</h2>
+              <p style="color:rgba(255,255,255,0.6);font-size:0.875rem;text-align:center;max-width:576px;margin:0 auto 56px">Traditional fact-checkers rely on a single AI model. Quorum uses four independent agents that cross-verify each other.</p>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px">
+                <div style="padding:24px;background:#111114;border:1px solid #222230;border-radius:16px">
+                  <div style="display:flex;align-items:start;justify-content:space-between;margin-bottom:16px"><span style="font-size:24px">👥</span><span style="font-weight:700;color:rgba(124,58,237,0.6)">4x</span></div>
+                  <h3 style="font-size:1rem;font-weight:600;margin-bottom:8px">Four agents, not one</h3>
+                  <p style="color:rgba(255,255,255,0.6);font-size:0.875rem;line-height:1.6">Four independent AI models cross-check each other for accuracy — not a single AI guessing at the truth.</p>
+                </div>
+                <div style="padding:24px;background:#111114;border:1px solid #222230;border-radius:16px">
+                  <div style="display:flex;align-items:start;justify-content:space-between;margin-bottom:16px"><span style="font-size:24px">👁️</span><span style="font-weight:700;color:rgba(124,58,237,0.6)">100%</span></div>
+                  <h3 style="font-size:1rem;font-weight:600;margin-bottom:8px">Full transparency</h3>
+                  <p style="color:rgba(255,255,255,0.6);font-size:0.875rem;line-height:1.6">Every claim is sourced. Every confidence score is backed by evidence you can trace back to its origin.</p>
+                </div>
+                <div style="padding:24px;background:#111114;border:1px solid #222230;border-radius:16px">
+                  <div style="display:flex;align-items:start;justify-content:space-between;margin-bottom:16px"><span style="font-size:24px">⚡</span><span style="font-weight:700;color:rgba(124,58,237,0.6)">Real-time</span></div>
+                  <h3 style="font-size:1rem;font-weight:600;margin-bottom:8px">Real-time detection</h3>
+                  <p style="color:rgba(255,255,255,0.6);font-size:0.875rem;line-height:1.6">Agents disagree in real time, flagging conflicts and hallucinations as they are discovered.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+          <section aria-labelledby="faq-heading" style="padding:96px 24px">
+            <div style="max-width:680px;margin:0 auto">
+              <p style="color:#7c3aed;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.2em;margin-bottom:16px;text-align:center">FAQ</p>
+              <h2 id="faq-heading" style="font-size:clamp(1.875rem,4vw,2.5rem);font-weight:700;letter-spacing:-0.02em;text-align:center;margin-bottom:56px">Frequently Asked Questions</h2>
+              <div style="margin-bottom:16px;padding:20px;background:#111114;border:1px solid #222230;border-radius:12px">
+                <h3 style="font-size:0.875rem;font-weight:600;margin-bottom:8px">What is Quorum AI fact-checking?</h3>
+                <p style="color:rgba(255,255,255,0.6);font-size:0.875rem;line-height:1.6">Quorum is a free multi-agent AI fact-verification system that uses four independent AI agents to research claims, cross-verify facts, detect hallucinations, and compile citation-backed reports with per-claim confidence scores.</p>
+              </div>
+              <div style="margin-bottom:16px;padding:20px;background:#111114;border:1px solid #222230;border-radius:12px">
+                <h3 style="font-size:0.875rem;font-weight:600;margin-bottom:8px">How does multi-agent verification work?</h3>
+                <p style="color:rgba(255,255,255,0.6);font-size:0.875rem;line-height:1.6">Each claim goes through four specialized AI agents in sequence: a Research Agent gathers sources, a Verification Agent cross-checks facts, a Hallucination Detector flags fabricated data, and a Synthesis Agent compiles the final report.</p>
+              </div>
+              <div style="margin-bottom:16px;padding:20px;background:#111114;border:1px solid #222230;border-radius:12px">
+                <h3 style="font-size:0.875rem;font-weight:600;margin-bottom:8px">Is Quorum free to use?</h3>
+                <p style="color:rgba(255,255,255,0.6);font-size:0.875rem;line-height:1.6">Yes, Quorum is completely free to use. It offers a demo mode that works without an API key, and a live mode that uses your own Anthropic API key for real AI-powered verification.</p>
+              </div>
+              <div style="margin-bottom:16px;padding:20px;background:#111114;border:1px solid #222230;border-radius:12px">
+                <h3 style="font-size:0.875rem;font-weight:600;margin-bottom:8px">Can I share fact-check reports?</h3>
+                <p style="color:rgba(255,255,255,0.6);font-size:0.875rem;line-height:1.6">Yes, Quorum generates unique shareable links for every completed report. You can share these links with anyone and they can view the full report without needing an account.</p>
+              </div>
+            </div>
+          </section>
+        </main>
+        <footer style="padding:40px 24px;border-top:1px solid rgba(255,255,255,0.05)">
+          <div style="max-width:768px;margin:0 auto;text-align:center">
+            <span style="font-weight:700;font-size:14px">Quorum</span>
+            <p style="color:rgba(255,255,255,0.3);font-size:12px;margin-top:8px;max-width:384px;margin-left:auto;margin-right:auto;line-height:1.6">Multi-agent AI fact-verification system using four independent agents for reliable, transparent, and explainable results.</p>
+            <div style="margin-top:24px;padding-top:24px;border-top:1px solid rgba(255,255,255,0.03);display:flex;justify-content:center;gap:16px;flex-wrap:wrap">
+              <a href="/privacy" style="color:rgba(255,255,255,0.3);font-size:12px;text-decoration:none">Privacy Policy</a>
+              <a href="/terms" style="color:rgba(255,255,255,0.3);font-size:12px;text-decoration:none">Terms of Service</a>
+            </div>
+            <p style="color:rgba(255,255,255,0.15);font-size:11px;margin-top:16px;line-height:1.6;max-width:576px;margin-left:auto;margin-right:auto">Quorum is a free, open-source multi-agent AI fact-verification system that uses four independent AI agents — Research, Verification, Hallucination Detection, and Synthesis — to verify claims with citation-backed evidence.</p>
+          </div>
+        </footer>
+      </div>
       <noscript>
         <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0a0a0f;color:#f0f0f5;font-family:system-ui,sans-serif;padding:2rem">
           <div style="text-align:center;max-width:480px">
-            <h1 style="font-size:1.5rem;font-weight:700;margin-bottom:0.75rem">Quorum — AI Fact-Verification</h1>
-            <p style="color:#888;font-size:0.9rem;line-height:1.6;margin-bottom:1.5rem">JavaScript is required to run Quorum's multi-agent AI fact-verification pipeline. Please enable JavaScript in your browser settings and reload the page.</p>
-            <p style="color:#666;font-size:0.8rem">Quorum uses four independent AI agents to research, cross-verify, detect hallucinations, and compile citation-backed reports.</p>
+            <h2 style="font-size:1.5rem;font-weight:700;margin-bottom:0.75rem">JavaScript Required</h2>
+            <p style="color:#888;font-size:0.9rem;line-height:1.6">Please enable JavaScript to use Quorum's multi-agent AI fact-verification pipeline.</p>
           </div>
         </div>
       </noscript>
