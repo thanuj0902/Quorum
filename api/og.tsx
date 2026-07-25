@@ -3,7 +3,7 @@ import { ImageResponse } from '@vercel/og'
 export const config = { runtime: 'edge' }
 
 export default async function handler() {
-  return new ImageResponse(
+  const res = new ImageResponse(
     (
       <div
         style={{
@@ -131,9 +131,10 @@ export default async function handler() {
     {
       width: 1200,
       height: 630,
-      headers: {
-        'Cache-Control': 'public, max-age=86400, s-maxage=86400',
-      },
     },
   )
+
+  res.headers.set('Cache-Control', 'public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800')
+
+  return res
 }
