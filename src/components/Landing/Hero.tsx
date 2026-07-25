@@ -107,7 +107,7 @@ export default function Hero({ onStart }: HeroProps) {
           </span>
         </motion.div>
 
-        {/* Headline — proper H1 with keyword */}
+        {/* H1 — keyword-rich, unique */}
         <motion.h1
           id="hero-heading"
           variants={fadeUp}
@@ -120,19 +120,19 @@ export default function Hero({ onStart }: HeroProps) {
           </span>
         </motion.h1>
 
-        {/* Subheadline with descriptive text content */}
+        {/* Primary description — keyword-rich, 150+ words total on page */}
         <motion.p
           variants={fadeUp}
-          className="text-text-secondary text-lg md:text-xl max-w-lg mx-auto mb-6 leading-relaxed"
+          className="text-text-secondary text-lg md:text-xl max-w-xl mx-auto mb-5 leading-relaxed"
         >
-          Quorum uses four independent AI agents to research, cross-verify, detect hallucinations, and compile citation-backed fact-check reports. Every claim sourced, every score explainable.
+          Quorum is a free multi-agent AI fact-verification system that uses four independent AI agents to research, cross-verify, detect hallucinations, and compile citation-backed verification reports. Every claim sourced, every score explainable.
         </motion.p>
 
         <motion.p
           variants={fadeUp}
-          className="text-text-secondary/60 text-sm max-w-md mx-auto mb-12 leading-relaxed"
+          className="text-text-secondary/60 text-sm max-w-lg mx-auto mb-12 leading-relaxed"
         >
-          Built for researchers, journalists, and anyone who needs to verify claims with evidence. Supports batch verification, shareable reports, and PDF export.
+          Built for journalists verifying breaking news, researchers validating citations, and anyone who needs to verify claims with evidence. Supports batch verification of multiple claims, shareable report links, and PDF export. No login required.
         </motion.p>
 
         {/* CTA */}
@@ -142,7 +142,7 @@ export default function Hero({ onStart }: HeroProps) {
             whileTap={{ scale: 0.97 }}
             onClick={onStart}
             className="group relative inline-flex items-center gap-3 px-9 py-4.5 bg-accent text-white font-semibold rounded-2xl transition-all duration-300 shadow-xl shadow-accent/25 hover:shadow-accent/40 focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base overflow-hidden"
-            aria-label="Start verifying a claim with Quorum's multi-agent pipeline"
+            aria-label="Start verifying a claim with Quorum's multi-agent AI fact-checking pipeline"
           >
             <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-700" />
             <span className="relative">Start Fact-Checking</span>

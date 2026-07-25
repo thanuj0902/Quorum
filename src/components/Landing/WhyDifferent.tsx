@@ -5,6 +5,7 @@ interface Point {
   icon: LucideIcon
   title: string
   desc: string
+  details: string
   stat: string
   statLabel: string
 }
@@ -14,22 +15,25 @@ const points: Point[] = [
     icon: Users,
     title: 'Four agents, not one',
     desc: 'Four independent AI models cross-check each other for accuracy — not a single AI guessing at the truth.',
+    details: 'Unlike single-model fact-checkers, Quorum uses a pipeline where each agent operates independently. The Research Agent, Verification Agent, Hallucination Detector, and Synthesis Agent all contribute separate assessments, reducing bias and catching errors.',
     stat: '4x',
-    statLabel: 'verification',
+    statLabel: 'verification depth',
   },
   {
     icon: Eye,
     title: 'Full transparency',
     desc: 'Every claim is sourced. Every confidence score is backed by evidence you can trace back to its origin.',
+    details: 'Quorum never makes unsupported assertions. Every confidence score links to source citations, agent reasoning, and evidence summaries. You can trace any claim back to its original sources and see exactly how each agent evaluated it.',
     stat: '100%',
-    statLabel: 'explainable',
+    statLabel: 'explainable results',
   },
   {
     icon: Zap,
     title: 'Real-time detection',
     desc: 'Agents disagree in real time, flagging conflicts and hallucinations as they are discovered during verification.',
+    details: 'The pipeline runs in real time with a live visualization showing each agent processing your claim. Hallucination detection happens inline — fabricated data and contradictions are flagged immediately as the agents discover them.',
     stat: 'Real-time',
-    statLabel: 'detection',
+    statLabel: 'detection pipeline',
   },
 ]
 
@@ -45,9 +49,9 @@ export default function WhyDifferent() {
           className="text-center mb-14"
         >
           <p className="text-accent text-xs font-semibold uppercase tracking-[0.2em] mb-4">Why different</p>
-          <h2 id="why-different-heading" className="font-display text-3xl md:text-[2.5rem] font-bold tracking-tight">Built for Trust, Not Speed</h2>
-          <p className="text-text-secondary text-sm mt-3 max-w-md mx-auto">
-            Traditional fact-checkers use a single AI model. Quorum uses four independent agents that cross-verify each other, producing more reliable results.
+          <h2 id="why-different-heading" className="font-display text-3xl md:text-[2.5rem] font-bold tracking-tight">Multi-Agent Verification vs Single-Model Fact-Checking</h2>
+          <p className="text-text-secondary text-sm mt-3 max-w-xl mx-auto">
+            Traditional fact-checkers rely on a single AI model, which can hallucinate or introduce bias. Quorum uses four independent agents that cross-verify each other, producing more reliable and transparent results.
           </p>
         </motion.div>
 
@@ -71,7 +75,8 @@ export default function WhyDifferent() {
                   <span className="font-display text-lg font-bold text-accent/60">{point.stat}</span>
                 </div>
                 <h3 className="font-display text-base font-semibold mb-2">{point.title}</h3>
-                <p className="text-text-secondary text-sm leading-relaxed">{point.desc}</p>
+                <p className="text-text-secondary text-sm leading-relaxed mb-2">{point.desc}</p>
+                <p className="text-text-secondary/40 text-xs leading-relaxed hidden md:block">{point.details}</p>
                 <p className="text-[11px] text-text-secondary/40 font-mono mt-3 uppercase tracking-wider">{point.statLabel}</p>
               </div>
             </motion.div>

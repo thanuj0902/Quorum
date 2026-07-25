@@ -4,15 +4,45 @@ import { Search, ShieldCheck, AlertTriangle, FileText, type LucideIcon } from 'l
 interface Step {
   icon: LucideIcon
   label: string
+  title: string
   desc: string
+  details: string
   color: 'accent' | 'green' | 'orange'
 }
 
 const steps: Step[] = [
-  { icon: Search, label: 'Research', desc: 'Extracts factual claims from multiple sources with citations and initial confidence scores', color: 'accent' },
-  { icon: ShieldCheck, label: 'Verify', desc: 'Independently cross-references each claim against reliable sources and adjusts confidence', color: 'green' },
-  { icon: AlertTriangle, label: 'Detect', desc: 'Finds contradictions between claims and flags potential hallucinations or fabricated data', color: 'orange' },
-  { icon: FileText, label: 'Synthesize', desc: 'Compiles a citation-backed report with per-claim confidence scores and executive summary', color: 'accent' },
+  {
+    icon: Search,
+    label: 'Step 1',
+    title: 'Research Agent',
+    desc: 'Extracts factual claims from your input and gathers sources with initial confidence scores.',
+    details: 'The Research Agent parses your input text, identifies distinct factual claims, and searches for supporting evidence. Each claim is tagged with source citations and an initial confidence rating based on source reliability.',
+    color: 'accent',
+  },
+  {
+    icon: ShieldCheck,
+    label: 'Step 2',
+    title: 'Verification Agent',
+    desc: 'Independently cross-references each claim against reliable sources and adjusts confidence.',
+    details: 'The Verification Agent takes each claim from the Research phase and independently verifies it against additional sources. Confidence scores are adjusted up or down based on corroborating or contradicting evidence.',
+    color: 'green',
+  },
+  {
+    icon: AlertTriangle,
+    label: 'Step 3',
+    title: 'Hallucination Detector',
+    desc: 'Finds contradictions between claims and flags potential hallucinations or fabricated data.',
+    details: 'The Hallucination Detector compares claims for internal consistency, checks for common AI fabrication patterns, flags statistical anomalies, and identifies claims that lack sufficient source coverage. Detected issues are flagged with severity levels.',
+    color: 'orange',
+  },
+  {
+    icon: FileText,
+    label: 'Step 4',
+    title: 'Synthesis Agent',
+    desc: 'Compiles a citation-backed report with per-claim confidence scores and executive summary.',
+    details: 'The Synthesis Agent takes all findings and compiles them into a structured verification report. Each claim receives a final confidence score, supporting evidence summary, and citation trail. The report includes an executive summary of overall claim reliability.',
+    color: 'accent',
+  },
 ]
 
 const colorMap = {
@@ -33,9 +63,9 @@ export default function HowItWorks() {
           className="text-center mb-16"
         >
           <p className="text-accent text-xs font-semibold uppercase tracking-[0.2em] mb-4">Process</p>
-          <h2 id="how-it-works-heading" className="font-display text-3xl md:text-[2.5rem] font-bold tracking-tight">How Quorum Works</h2>
-          <p className="text-text-secondary text-sm mt-3 max-w-lg mx-auto">
-            Each verification runs through four specialized AI agents in sequence. Every agent works independently, ensuring no single point of failure in the fact-checking process.
+          <h2 id="how-it-works-heading" className="font-display text-3xl md:text-[2.5rem] font-bold tracking-tight">How Quorum's Multi-Agent Verification Works</h2>
+          <p className="text-text-secondary text-sm mt-3 max-w-xl mx-auto">
+            Each verification runs through four specialized AI agents in sequence. Every agent works independently, ensuring no single point of failure in the fact-checking process. The multi-agent approach produces more reliable results than single-model verification.
           </p>
         </motion.div>
 
@@ -48,7 +78,7 @@ export default function HowItWorks() {
               const c = colorMap[step.color]
               return (
                 <motion.div
-                  key={step.label}
+                  key={step.title}
                   initial={{ opacity: 0, y: 30 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
@@ -65,8 +95,9 @@ export default function HowItWorks() {
                       </span>
                     </div>
 
-                    <h3 className="font-display text-base font-semibold mb-1.5">{step.label}</h3>
-                    <p className="text-text-secondary text-sm leading-relaxed max-w-[200px] mx-auto">{step.desc}</p>
+                    <h3 className="font-display text-base font-semibold mb-1">{step.title}</h3>
+                    <p className="text-text-secondary text-xs leading-relaxed max-w-[200px] mx-auto mb-2">{step.desc}</p>
+                    <p className="text-text-secondary/40 text-[11px] leading-relaxed max-w-[200px] mx-auto hidden md:block">{step.details}</p>
                   </div>
                 </motion.div>
               )

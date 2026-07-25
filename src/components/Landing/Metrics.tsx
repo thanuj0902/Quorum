@@ -9,10 +9,10 @@ interface Metric {
 }
 
 const metrics: Metric[] = [
-  { icon: Cpu, value: '4', label: 'Independent AI Agents', desc: 'Each specializing in a verification task' },
-  { icon: Clock, value: '<15s', label: 'Full Pipeline', desc: 'End-to-end claim verification' },
-  { icon: Shield, value: '0', label: 'Fabricated Claims', desc: 'Hallucination detection built in' },
-  { icon: Layers, value: '12+', label: 'Sources Cross-Referenced', desc: 'Per verification run' },
+  { icon: Cpu, value: '4', label: 'Independent AI Agents', desc: 'Research, Verification, Hallucination Detection, and Synthesis agents working independently' },
+  { icon: Clock, value: '<15s', label: 'Full Pipeline', desc: 'End-to-end multi-agent claim verification in under 15 seconds' },
+  { icon: Shield, value: '0', label: 'Fabricated Claims', desc: 'Built-in hallucination detection catches AI fabrications before they reach your report' },
+  { icon: Layers, value: '12+', label: 'Sources Cross-Referenced', desc: 'Multiple independent sources verified per claim for maximum reliability' },
 ]
 
 export default function Metrics() {
@@ -27,8 +27,10 @@ export default function Metrics() {
           className="text-center mb-14"
         >
           <p className="text-accent text-xs font-semibold uppercase tracking-[0.2em] mb-4">Architecture</p>
-          <h2 id="metrics-heading" className="font-display text-3xl md:text-[2.5rem] font-bold tracking-tight">Multi-agent by design</h2>
-          <p className="text-text-secondary text-sm mt-3 max-w-md mx-auto">Four specialized agents working independently, cross-checking each other for maximum reliability.</p>
+          <h2 id="metrics-heading" className="font-display text-3xl md:text-[2.5rem] font-bold tracking-tight">Quorum's Multi-Agent Architecture</h2>
+          <p className="text-text-secondary text-sm mt-3 max-w-xl mx-auto">
+            Four specialized AI agents working independently in a verification pipeline, cross-checking each other for maximum reliability. Built for accuracy, not just speed.
+          </p>
         </motion.div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -49,7 +51,7 @@ export default function Metrics() {
               </div>
               <div className="font-display text-3xl font-bold text-accent mb-1">{m.value}</div>
               <div className="text-sm font-semibold mb-1">{m.label}</div>
-              <div className="text-xs text-text-secondary/50">{m.desc}</div>
+              <div className="text-xs text-text-secondary/50 leading-relaxed">{m.desc}</div>
             </motion.div>
           ))}
         </div>
