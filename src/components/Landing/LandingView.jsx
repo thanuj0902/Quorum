@@ -12,8 +12,6 @@ export default function LandingView({ onStart }) {
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <Logo onClick={onStart} />
           <div className="flex items-center gap-3">
-            <span className="text-[11px] text-text-secondary/70 font-mono uppercase tracking-wider px-3 py-1.5 rounded-lg border border-border/60 bg-surface/40 backdrop-blur-sm">INNOVA HACK 2026</span>
-            <span className="text-[11px] text-accent font-mono uppercase tracking-wider px-3 py-1.5 rounded-lg border border-accent/15 bg-accent/[0.06] backdrop-blur-sm">Gen AI</span>
           </div>
         </div>
       </nav>
