@@ -124,7 +124,7 @@ async def call_llm(system_prompt: str, user_prompt: str, api_key: str) -> str:
     groq_key = os.getenv("GROQ_API_KEY")
     if groq_key:
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
+            async with httpx.AsyncClient(timeout=120.0) as client:
                 response = await client.post(
                     "https://api.groq.com/openai/v1/chat/completions",
                     headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
@@ -607,12 +607,14 @@ async def run_pipeline(topic: str, api_key: str):
 
     # Step 2: Verify
     logger.info("[Pipeline] Starting verifier agent")
+    await asyncio.sleep(2)
     verified, log2 = await verifier_agent(claims, topic, api_key, search_results)
     pipeline_log.append(log2)
     yield {"event": "agent_complete", "data": json.dumps(log2)}
 
     # Step 3: Contradiction detection
     logger.info("[Pipeline] Starting contradiction agent")
+    await asyncio.sleep(2)
     flags, log3 = await contradiction_agent(verified, topic, api_key)
     pipeline_log.append(log3)
     yield {"event": "agent_complete", "data": json.dumps(log3)}
@@ -631,6 +633,7 @@ async def run_pipeline(topic: str, api_key: str):
         }
 
     # Step 5: Synthesize
+    await asyncio.sleep(2)
     report_data, log4 = await synthesizer_agent(topic, verified, flags, api_key)
     pipeline_log.append(log4)
     yield {"event": "agent_complete", "data": json.dumps(log4)}
