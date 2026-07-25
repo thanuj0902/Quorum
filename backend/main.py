@@ -120,42 +120,46 @@ def clean_json(text: str) -> str:
 async def call_llm(system_prompt: str, user_prompt: str, api_key: str) -> str:
     errors = []
 
-    # Provider 1: Groq (fastest)
+    # Provider 1: Groq (fastest) — retry up to 3 times with backoff on 429
     groq_key = os.getenv("GROQ_API_KEY")
     if groq_key:
-        try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
-                response = await client.post(
-                    "https://api.groq.com/openai/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
-                    json={
-                        "model": "llama-3.1-8b-instant",
-                        "max_tokens": 4096,
-                        "temperature": 0.2,
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt},
-                        ],
-                    },
-                )
-                if response.status_code == 200:
-                    data = response.json()
-                    if "choices" in data and data["choices"]:
-                        return data["choices"][0]["message"]["content"]
-                elif response.status_code == 429:
-                    errors.append("Groq: rate limited")
-                    logger.warning("Groq rate limited")
-                else:
-                    errors.append(f"Groq: HTTP {response.status_code}")
-                    logger.warning(f"Groq returned {response.status_code}: {response.text[:200]}")
-        except Exception as e:
-            errors.append(f"Groq: {e}")
-            logger.warning(f"Groq failed: {e}")
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient(timeout=120.0) as client:
+                    response = await client.post(
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+                        json={
+                            "model": "llama-3.1-8b-instant",
+                            "max_tokens": 4096,
+                            "temperature": 0.2,
+                            "messages": [
+                                {"role": "system", "content": system_prompt},
+                                {"role": "user", "content": user_prompt},
+                            ],
+                        },
+                    )
+                    if response.status_code == 200:
+                        data = response.json()
+                        if "choices" in data and data["choices"]:
+                            return data["choices"][0]["message"]["content"]
+                    elif response.status_code == 429:
+                        retry_after = int(response.headers.get("retry-after", 5 + attempt * 10))
+                        logger.warning(f"Groq rate limited (attempt {attempt+1}/3), waiting {retry_after}s")
+                        await asyncio.sleep(retry_after)
+                        continue
+                    else:
+                        errors.append(f"Groq: HTTP {response.status_code}")
+                        logger.warning(f"Groq returned {response.status_code}")
+            except Exception as e:
+                errors.append(f"Groq: {e}")
+                logger.warning(f"Groq failed: {e}")
+        errors.append("Groq: exhausted retries")
 
     # Provider 2: Gemini (fallback)
     gemini_key = os.getenv("GEMINI_API_KEY")
     if gemini_key:
-        for attempt in range(2):
+        for attempt in range(3):
             try:
                 async with httpx.AsyncClient(timeout=60.0) as client:
                     response = await client.post(
@@ -170,9 +174,12 @@ async def call_llm(system_prompt: str, user_prompt: str, api_key: str) -> str:
                         data = response.json()
                         text = data["candidates"][0]["content"]["parts"][0]["text"]
                         return text
+                    elif response.status_code == 429:
+                        wait = 5 + attempt * 15
+                        logger.warning(f"Gemini rate limited (attempt {attempt+1}/3), waiting {wait}s")
+                        await asyncio.sleep(wait)
                     else:
                         errors.append(f"Gemini: HTTP {response.status_code}")
-                        logger.warning(f"Gemini returned {response.status_code}: {response.text[:200]}")
             except Exception as e:
                 errors.append(f"Gemini attempt {attempt + 1}: {e}")
                 logger.warning(f"Gemini failed: {e}")
