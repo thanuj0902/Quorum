@@ -19,7 +19,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("quorum")
 
-app = FastAPI(title="Quorum", version="4.1.0", description="Multi-agent AI fact-verification system")
+app = FastAPI(title="Quorum", version="4.2.0", description="Multi-agent AI fact-verification system")
 
 MAX_TOPIC_LENGTH = 500
 MAX_RETRIES = 2
@@ -641,12 +641,13 @@ async def run_pipeline(topic: str, api_key: str, api_key_2: str | None = None):
 
     # Step 3: Contradiction Detector — uses key_a (key B just did verifier, avoid rate limit)
     logger.info("[Pipeline] Step 3: Contradiction Detector (key A)")
+    flags = []
     for contra_attempt in range(2):
         flags, log3 = await contradiction_agent(verified, topic, key_a)
-        if flags:  # Got a non-empty result (even empty list is valid)
+        if isinstance(flags, list):
             break
         if contra_attempt == 0:
-            logger.warning("[Pipeline] Contradiction detector returned empty, retrying...")
+            logger.warning("[Pipeline] Contradiction detector returned non-list, retrying...")
             await asyncio.sleep(2)
     pipeline_log.append(log3)
     yield {"event": "agent_complete", "data": json.dumps(log3)}
@@ -792,7 +793,7 @@ async def health():
     return {
         "status": "ok",
         "service": "Quorum",
-        "version": "4.1.0",
+        "version": "4.2.0",
         "providers": {
             "groq": bool(api_key),
             "groq_key_b": bool(GROQ_API_KEY_2),
