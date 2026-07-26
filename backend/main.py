@@ -387,7 +387,7 @@ Extract 4-6 key factual claims. For each, provide:
 Return a JSON array. No markdown, no explanation.'''
 
     start = time.time()
-    result = await call_llm(system, prompt, api_key, preferred_provider=provider)
+    result = await call_llm(system, prompt, api_key)
     claims = parse_agent_json(result, "Research Agent")
     duration = time.time() - start
 
@@ -439,7 +439,7 @@ Return a JSON array with exactly these fields per claim:
 claim, source, source_url, confidence (0.0-1.0), verification_status, supporting_sources (array of source names), contradicting_sources (array of source names), reasoning (1-2 sentences explaining verification)'''
 
     start = time.time()
-    result = await call_llm(system, prompt, api_key, preferred_provider=provider)
+    result = await call_llm(system, prompt, api_key)
     verified = parse_agent_json(result, "Verification Agent")
     duration = time.time() - start
 
@@ -493,7 +493,7 @@ Also provide an OVERALL_ASSESSMENT entry with claim="OVERALL_ASSESSMENT" summari
 Return a JSON array with: claim, flag_type, reason, severity, contradicting_sources, evidence_gaps.'''
 
     start = time.time()
-    result = await call_llm(system, prompt, api_key, preferred_provider=provider)
+    result = await call_llm(system, prompt, api_key)
     flags = parse_agent_json(result, "Contradiction Detector")
     duration = time.time() - start
 
@@ -550,7 +550,7 @@ Return JSON with exactly these fields:
 }}'''
 
     start = time.time()
-    result = await call_llm(system, prompt, api_key, preferred_provider=provider)
+    result = await call_llm(system, prompt, api_key)
     report_data = parse_agent_json(result, "Synthesizer")
     duration = time.time() - start
 
