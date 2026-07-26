@@ -1,7 +1,8 @@
 import { memo, useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Trash2, FileText, BarChart3, AlertTriangle, Clock, Search } from 'lucide-react'
+import { ArrowLeft, Trash2, FileText, BarChart3, AlertTriangle, Clock, Search, Sun, Moon } from 'lucide-react'
 import Logo from '../ui/Logo'
+import { useTheme } from '../../hooks/useTheme'
 import type { HistoryEntry } from '../../types'
 
 interface HistoryViewProps {
@@ -44,6 +45,7 @@ const statCards = [
 ] as const
 
 function HistoryView({ history, stats, onSelect, onDelete, onBack }: HistoryViewProps) {
+  const { theme, toggle } = useTheme()
   const sorted = useMemo(() =>
     [...history].sort((a, b) => b.timestamp - a.timestamp),
     [history]
@@ -54,13 +56,23 @@ function HistoryView({ history, stats, onSelect, onDelete, onBack }: HistoryView
       <nav className="sticky top-0 z-50 px-6 py-4 bg-base/80 backdrop-blur-xl border-b border-border/50">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <Logo onClick={onBack} />
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 text-sm text-text-secondary hover:text-text transition-colors duration-200"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={toggle}
+              className="w-9 h-9 flex items-center justify-center rounded-xl border border-border text-text-secondary transition-all duration-300 hover:border-accent/30 hover:text-text"
+              style={{ background: 'var(--color-surface)' }}
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={onBack}
+              className="flex items-center gap-2 text-sm text-text-secondary hover:text-text transition-colors duration-200"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back
+            </button>
+          </div>
         </div>
       </nav>
 

@@ -1,12 +1,13 @@
 import { useState, useCallback } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Save, FileDown, Share2, History, Mic, MicOff, Layers } from 'lucide-react'
+import { Save, FileDown, Share2, History, Mic, MicOff, Layers, Sun, Moon } from 'lucide-react'
 import Logo from '../ui/Logo'
 import PipelineVisualizer from './PipelineVisualizer'
 import ConfidenceReport from '../Report/ConfidenceReport'
 import SourceTrustLedger from '../Report/SourceTrustLedger'
 import { exportReportAsPDF } from '../../utils/pdf'
 import { useVoiceInput } from '../../hooks/useVoiceInput'
+import { useTheme } from '../../hooks/useTheme'
 import type { PipelinePhase, PipelineState, VerificationReport } from '../../types'
 
 interface PipelineViewProps {
@@ -24,6 +25,7 @@ interface PipelineViewProps {
 export default function PipelineView({ phase, pipelineState, report, error, onBack, onAnalyze, onSaveReport, onViewHistory, onOpenBatch }: PipelineViewProps) {
   const [topic, setTopic] = useState<string>('Impact of artificial intelligence on healthcare diagnostics')
   const { isListening, transcript, isSupported: voiceSupported, startListening, stopListening, resetTranscript } = useVoiceInput()
+  const { theme, toggle } = useTheme()
 
   const handleSubmit = useCallback(() => {
     const trimmed = topic.trim()
@@ -85,6 +87,14 @@ export default function PipelineView({ phase, pipelineState, report, error, onBa
           <Logo onClick={onBack} />
 
           <div className="flex items-center gap-3" aria-live="polite">
+            <button
+              onClick={toggle}
+              className="w-9 h-9 flex items-center justify-center rounded-xl border border-border text-text-secondary transition-all duration-300 hover:border-accent/30 hover:text-text"
+              style={{ background: 'var(--color-surface)' }}
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
             {phase === 'running' && (
               <motion.span
                 animate={{ opacity: [0.4, 1, 0.4] }}

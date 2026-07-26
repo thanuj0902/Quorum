@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import ToastContainer from './components/ui/Toast'
+import { ThemeProvider } from './hooks/useTheme'
 import { usePipeline } from './hooks/usePipeline'
 import { useHistory, fetchReportFromServer } from './hooks/useHistory'
 import { useToast } from './hooks/useToast'
@@ -91,6 +92,7 @@ export default function App() {
   const activeReport = selectedEntry?.fullReport || serverReport
 
   return (
+    <ThemeProvider>
     <ErrorBoundary>
       <div className="min-h-screen bg-base text-text noise-overlay">
         <Suspense fallback={<LoadingSpinner />}>
@@ -229,5 +231,6 @@ export default function App() {
         <ToastContainer toasts={toasts} onRemove={removeToast} />
       </div>
     </ErrorBoundary>
+    </ThemeProvider>
   )
 }

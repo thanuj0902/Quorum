@@ -24,6 +24,28 @@
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 
+/* Light mode overrides */
+.light {
+  --color-base: #F8F8FC;
+  --color-surface: #FFFFFF;
+  --color-surface-2: #F0F0F5;
+  --color-surface-3: #E8E8EE;
+  --color-border: #D8D8E3;
+  --color-border-hover: #C0C0D0;
+  --color-text: #1A1A2E;
+  --color-text-secondary: #6B6B80;
+  --color-accent: #7C3AED;
+  --color-accent-dim: rgba(124, 58, 237, 0.08);
+  --color-accent-glow: rgba(124, 58, 237, 0.15);
+  --color-green: #059669;
+  --color-green-dim: rgba(5, 150, 105, 0.08);
+  --color-yellow: #D97706;
+  --color-yellow-dim: rgba(217, 119, 6, 0.08);
+  --color-red: #DC2626;
+  --color-red-dim: rgba(220, 38, 38, 0.08);
+  --color-orange: #EA580C;
+}
+
 @layer base {
   html {
     scroll-behavior: smooth;
@@ -38,9 +60,13 @@
     overflow-x: hidden;
   }
 
-  ::selection {
-    background: rgba(124, 58, 237, 0.3);
-    color: #fff;
+  .light ::selection {
+    background: rgba(124, 58, 237, 0.2);
+    color: #1A1A2E;
+  }
+
+  .light * {
+    scrollbar-color: var(--color-border) transparent;
   }
 
   :focus-visible {
@@ -83,6 +109,11 @@
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-repeat: repeat;
   background-size: 256px 256px;
+}
+
+.light .noise-overlay::before {
+  opacity: 0.025;
+  mix-blend-mode: multiply;
 }
 
 @keyframes gradient {
@@ -206,6 +237,10 @@
   background: rgba(17, 17, 20, 0.7);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+}
+
+.light .glass {
+  background: rgba(255, 255, 255, 0.7);
 }
 
 /* Gradient border utility */

@@ -19,7 +19,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("quorum")
 
-app = FastAPI(title="Quorum", version="4.2.0", description="Multi-agent AI fact-verification system")
+app = FastAPI(title="Quorum", version="4.3.0", description="Multi-agent AI fact-verification system")
 
 MAX_TOPIC_LENGTH = 500
 MAX_RETRIES = 2
@@ -34,6 +34,7 @@ REPORT_STORE_MAX = 200  # max reports to keep in memory
 
 
 GROQ_API_KEY_2 = os.getenv("GROQ_API_KEY_2", "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")
+GROQ_API_KEY_3 = os.getenv("GROQ_API_KEY_3", "")
 
 
 class RateLimitMiddleware:
@@ -103,6 +104,7 @@ class ResearchRequest(BaseModel):
     topic: str = Field(..., min_length=3, max_length=MAX_TOPIC_LENGTH)
     stream: bool = Field(default=False)
     api_key_2: str | None = Field(default=None)
+    api_key_3: str | None = Field(default=None)
 
 
 class BatchRequest(BaseModel):
@@ -613,14 +615,16 @@ Return JSON with exactly these fields:
 
 # --- Pipeline execution ---
 
-async def run_pipeline(topic: str, api_key: str, api_key_2: str | None = None):
+async def run_pipeline(topic: str, api_key: str, api_key_2: str | None = None, api_key_3: str | None = None):
     pipeline_log = []
     pipeline_start = time.time()
 
     key_a = api_key       # Groq key A → Research + Synthesizer
-    key_b = api_key_2 or api_key  # Groq key B → Verifier + Contradiction
+    key_b = api_key_2 or api_key  # Groq key B → Verifier
+    key_c = api_key_3 or api_key  # Groq key C → Contradiction (falls back to A if not set)
 
-    logger.info(f"[Pipeline] Using {'dual' if api_key_2 else 'single'} Groq keys")
+    key_count = sum(1 for k in [api_key, api_key_2, api_key_3] if k)
+    logger.info(f"[Pipeline] Using {key_count}-key mode")
 
     # Step 0: Web search
     logger.info(f"[Pipeline] Starting search for: {topic[:50]}")
@@ -629,21 +633,24 @@ async def run_pipeline(topic: str, api_key: str, api_key_2: str | None = None):
 
     # Step 1: Research Agent — uses key_a
     logger.info("[Pipeline] Step 1: Research Agent (key A)")
+    yield {"event": "agent_start", "data": json.dumps({"agent": "researcher", "label": "Research", "message": "Searching web sources..."})}
     claims, log1 = await research_agent(topic, key_a, search_results)
     pipeline_log.append(log1)
     yield {"event": "agent_complete", "data": json.dumps(log1)}
 
     # Step 2: Verification Agent — uses key_b (different key, no sleep needed)
     logger.info("[Pipeline] Step 2: Verification Agent (key B)")
+    yield {"event": "agent_start", "data": json.dumps({"agent": "verifier", "label": "Verifier", "message": "Cross-checking claims against sources..."})}
     verified, log2 = await verifier_agent(claims, topic, key_b, search_results)
     pipeline_log.append(log2)
     yield {"event": "agent_complete", "data": json.dumps(log2)}
 
-    # Step 3: Contradiction Detector — uses key_a (key B just did verifier, avoid rate limit)
-    logger.info("[Pipeline] Step 3: Contradiction Detector (key A)")
+    # Step 3: Contradiction Detector — uses key_c (dedicated key, avoids rate limits)
+    logger.info("[Pipeline] Step 3: Contradiction Detector (key C)")
+    yield {"event": "agent_start", "data": json.dumps({"agent": "contradiction", "label": "Contradiction", "message": "Scanning for hallucinations and contradictions..."})}
     flags = []
     for contra_attempt in range(2):
-        flags, log3 = await contradiction_agent(verified, topic, key_a)
+        flags, log3 = await contradiction_agent(verified, topic, key_c)
         if isinstance(flags, list):
             break
         if contra_attempt == 0:
@@ -668,6 +675,7 @@ async def run_pipeline(topic: str, api_key: str, api_key_2: str | None = None):
 
     # Step 5: Synthesizer Agent — uses key_a
     logger.info("[Pipeline] Step 5: Synthesizer Agent (key A)")
+    yield {"event": "agent_start", "data": json.dumps({"agent": "synthesizer", "label": "Synthesizer", "message": "Compiling citation-backed report..."})}
     report_data, log4 = await synthesizer_agent(topic, verified, flags, key_a)
     pipeline_log.append(log4)
     yield {"event": "agent_complete", "data": json.dumps(log4)}
@@ -703,7 +711,7 @@ async def research(request: ResearchRequest):
 
     if request.stream:
         async def event_generator():
-            async for event in run_pipeline(request.topic, api_key, request.api_key_2):
+            async for event in run_pipeline(request.topic, api_key, request.api_key_2, request.api_key_3):
                 yield f"event: {event['event']}\ndata: {event['data']}\n\n"
 
         return StreamingResponse(
@@ -719,7 +727,7 @@ async def research(request: ResearchRequest):
     # Non-streaming: collect all events and return final result
     try:
         result = None
-        async for event in run_pipeline(request.topic, api_key, request.api_key_2):
+        async for event in run_pipeline(request.topic, api_key, request.api_key_2, request.api_key_3):
             if event["event"] == "complete":
                 result = json.loads(event["data"])
 
@@ -780,6 +788,10 @@ async def startup_check():
         logger.info("Groq API key B configured (dual-key mode)")
     else:
         logger.info("GROQ_API_KEY_2 not set — using single-key mode")
+    if GROQ_API_KEY_3:
+        logger.info("Groq API key C configured (tri-key mode)")
+    else:
+        logger.info("GROQ_API_KEY_3 not set")
     if brave_key:
         logger.info("Brave Search API configured (primary search)")
     else:
@@ -793,12 +805,14 @@ async def health():
     return {
         "status": "ok",
         "service": "Quorum",
-        "version": "4.2.0",
+        "version": "4.3.0",
         "providers": {
             "groq": bool(api_key),
             "groq_key_b": bool(GROQ_API_KEY_2),
+            "groq_key_c": bool(GROQ_API_KEY_3),
         },
         "api_key_configured": bool(api_key),
+        "tri_key_mode": bool(GROQ_API_KEY_2 and GROQ_API_KEY_3),
         "dual_key_mode": bool(GROQ_API_KEY_2),
         "search_provider": "brave" if brave_key else "duckduckgo",
         "pipeline_agents": ["researcher", "verifier", "contradiction", "synthesizer"],
@@ -810,7 +824,7 @@ async def test_llm():
     groq_key = os.getenv("GROQ_API_KEY")
     results = {}
 
-    for label, key in [("groq", groq_key), ("groq_key_b", GROQ_API_KEY_2)]:
+    for label, key in [("groq", groq_key), ("groq_key_b", GROQ_API_KEY_2), ("groq_key_c", GROQ_API_KEY_3)]:
         if key:
             try:
                 async with httpx.AsyncClient(timeout=30.0) as client:

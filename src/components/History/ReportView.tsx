@@ -1,7 +1,8 @@
 import { memo, useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Copy, Check, ExternalLink, CheckCircle2, AlertTriangle, XCircle, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, Copy, Check, ExternalLink, CheckCircle2, AlertTriangle, XCircle, ShieldCheck, Sun, Moon } from 'lucide-react'
 import Logo from '../ui/Logo'
+import { useTheme } from '../../hooks/useTheme'
 import { confidenceClasses } from '../../utils/colors'
 import type { VerificationReport, Claim } from '../../types'
 
@@ -51,6 +52,7 @@ function statusLabel(status: Claim['verification_status']) {
 }
 
 function ReportView({ report, onBack, onCopyLink, linkCopied }: ReportViewProps) {
+  const { theme, toggle } = useTheme()
   const overallScore = Math.round((report.overall_confidence || 0) * 100)
   const claims = report.claims || []
   const { gradient: scoreColor } = confidenceClasses(overallScore)
@@ -76,20 +78,30 @@ function ReportView({ report, onBack, onCopyLink, linkCopied }: ReportViewProps)
             <Logo onClick={onBack} />
           </div>
 
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={onCopyLink}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border"
-            style={{
-              background: linkCopied ? 'rgba(52,211,153,0.08)' : 'rgba(124,58,237,0.08)',
-              borderColor: linkCopied ? 'rgba(52,211,153,0.2)' : 'rgba(124,58,237,0.2)',
-              color: linkCopied ? '#34D399' : '#A78BFA',
-            }}
-          >
-            {linkCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-            {linkCopied ? 'Copied' : 'Copy Share Link'}
-          </motion.button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={toggle}
+              className="w-9 h-9 flex items-center justify-center rounded-xl border border-border text-text-secondary transition-all duration-300 hover:border-accent/30 hover:text-text"
+              style={{ background: 'var(--color-surface)' }}
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={onCopyLink}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border"
+              style={{
+                background: linkCopied ? 'rgba(52,211,153,0.08)' : 'rgba(124,58,237,0.08)',
+                borderColor: linkCopied ? 'rgba(52,211,153,0.2)' : 'rgba(124,58,237,0.2)',
+                color: linkCopied ? '#34D399' : '#A78BFA',
+              }}
+            >
+              {linkCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              {linkCopied ? 'Copied' : 'Copy Share Link'}
+            </motion.button>
+          </div>
         </div>
       </header>
 
