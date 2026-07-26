@@ -33,8 +33,8 @@ report_store: dict[str, dict] = {}
 REPORT_STORE_MAX = 200  # max reports to keep in memory
 
 
-GROQ_API_KEY_2 = os.getenv("GROQ_API_KEY_2", "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")
-GROQ_API_KEY_3 = os.getenv("GROQ_API_KEY_3", "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")
+GROQ_API_KEY_2 = os.getenv("GROQ_API_KEY_2", "")
+GROQ_API_KEY_3 = os.getenv("GROQ_API_KEY_3", "")
 
 
 class RateLimitMiddleware:
