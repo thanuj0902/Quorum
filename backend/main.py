@@ -19,7 +19,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("quorum")
 
-app = FastAPI(title="Quorum", version="3.0.0", description="Multi-agent AI fact-verification system")
+app = FastAPI(title="Quorum", version="3.1.0", description="Multi-agent AI fact-verification system")
 
 MAX_TOPIC_LENGTH = 500
 MAX_RETRIES = 2
@@ -770,7 +770,7 @@ async def health():
     return {
         "status": "ok",
         "service": "Quorum",
-        "version": "3.0.0",
+        "version": "3.1.0",
         "providers": {
             "groq": bool(api_key),
             "gemini": bool(gemini_key),
