@@ -181,6 +181,13 @@ export default function Hero({ onStart }: HeroProps) {
 
         <motion.p
           variants={fadeUp}
+          className="text-accent/70 text-sm max-w-lg mx-auto mb-12 leading-relaxed"
+        >
+          Generative AI tools are powerful researchers but often struggle with hallucination and unverified claims. Quorum solves this by having multiple AI agents check and challenge each other — producing far more trustworthy output than a single model working alone.
+        </motion.p>
+
+        <motion.p
+          variants={fadeUp}
           className="text-text-secondary/60 text-sm max-w-lg mx-auto mb-12 leading-relaxed"
         >
           Built for journalists verifying breaking news, researchers validating citations, and anyone who needs to verify claims with evidence. Supports batch verification of multiple claims, shareable report links, and PDF export. No login required.

@@ -19,7 +19,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("quorum")
 
-app = FastAPI(title="Quorum", version="4.0.0", description="Multi-agent AI fact-verification system")
+app = FastAPI(title="Quorum", version="4.1.0", description="Multi-agent AI fact-verification system")
 
 MAX_TOPIC_LENGTH = 500
 MAX_RETRIES = 2
@@ -95,6 +95,7 @@ app.add_middleware(NoCacheMiddleware)
 class ResearchRequest(BaseModel):
     topic: str = Field(..., min_length=3, max_length=MAX_TOPIC_LENGTH)
     stream: bool = Field(default=False)
+    api_key_2: str | None = Field(default=None)
 
 
 class BatchRequest(BaseModel):
@@ -565,98 +566,40 @@ Return JSON with exactly these fields:
 
 # --- Pipeline execution ---
 
-async def run_pipeline(topic: str, api_key: str):
+async def run_pipeline(topic: str, api_key: str, api_key_2: str | None = None):
     pipeline_log = []
     pipeline_start = time.time()
+
+    key_a = api_key       # Groq key A → Research + Synthesizer
+    key_b = api_key_2 or api_key  # Groq key B → Verifier + Contradiction
+
+    logger.info(f"[Pipeline] Using {'dual' if api_key_2 else 'single'} Groq keys")
 
     # Step 0: Web search
     logger.info(f"[Pipeline] Starting search for: {topic[:50]}")
     search_results = await web_search(topic, max_results=5)
     logger.info(f"[Pipeline] Search returned {len(search_results)} results")
 
-    # Combined LLM call — all 4 agents in one prompt to stay within Groq rate limits
-    search_context = ""
-    if search_results:
-        search_context = "\n\nREAL WEB SEARCH RESULTS (use these as primary sources):\n"
-        for i, r in enumerate(search_results[:5], 1):
-            search_context += f"\n{i}. {r['title']}\n   URL: {r['url']}\n   Content: {r['content'][:300]}\n"
-
-    system = (
-        "You are ALL FOUR agents in Quorum's multi-agent fact-verification pipeline:\n"
-        "1. RESEARCHER — extract factual claims from the topic\n"
-        "2. VERIFIER — cross-reference each claim against multiple sources\n"
-        "3. CONTRADICTION DETECTOR — detect contradictions and hallucinations\n"
-        "4. SYNTHESIZER — compile the executive summary\n\n"
-        "Use the web search results as primary sources. "
-        "For each claim, track supporting AND contradicting sources separately. "
-        "Return ONLY valid JSON — no markdown, no explanation outside the JSON."
-    )
-    prompt = f'''Analyze: "{topic}"
-{search_context}
-
-Return a JSON object with these EXACT fields:
-{{
-  "claims": [
-    {{
-      "claim": "factual statement",
-      "source": "source name",
-      "source_url": "URL if available",
-      "confidence": 0.0-1.0,
-      "verification_status": "verified|partially_verified|unverified|contradicted",
-      "supporting_sources": ["source1", "source2"],
-      "contradicting_sources": ["source1"],
-      "reasoning": "1-2 sentence explanation",
-      "category": "statistic|historical|scientific|financial|technical|general"
-    }}
-  ],
-  "hallucinations": [
-    {{
-      "claim": "problematic claim",
-      "flag_type": "direct_contradiction|unsubstantiated",
-      "reason": "why flagged",
-      "severity": "none|low|medium|high|critical",
-      "contradicting_sources": [],
-      "evidence_gaps": "what evidence is missing"
-    }}
-  ],
-  "summary": "3-5 sentence executive summary",
-  "confidence_reasoning": "1-2 sentence explanation of confidence"
-}}
-
-Extract 4-6 claims. For each hallucination entry, only include claims that have actual issues (flag_type not "none").'''
-
-    # Emit agent events with realistic timing from a single combined call
-    log1 = {"agent": "researcher", "status": "done", "message": "Extracting claims from web sources", "duration": 0}
+    # Step 1: Research Agent — uses key_a
+    logger.info("[Pipeline] Step 1: Research Agent (key A)")
+    claims, log1 = await research_agent(topic, key_a, search_results)
     pipeline_log.append(log1)
     yield {"event": "agent_complete", "data": json.dumps(log1)}
 
-    logger.info("[Pipeline] Starting combined LLM call")
-    try:
-        result = await call_llm(system, prompt, api_key)
-        data = parse_agent_json(result, "Combined Agent")
-    except Exception as e:
-        logger.error(f"[Pipeline] Combined agent failed: {e}")
-        raise
-
-    claims = data.get("claims", [])
-    flags = data.get("hallucinations", [])
-
-    log1_done = {"agent": "researcher", "status": "done", "message": f"Extracted {len(claims)} claims from {len(search_results)} web sources", "duration": 1.2}
-    pipeline_log[-1] = log1_done
-    yield {"event": "agent_complete", "data": json.dumps(log1_done)}
-
-    log2 = {"agent": "verifier", "status": "done", "message": f"Verified {len(claims)} claims against {len(search_results)} sources", "duration": 1.8}
+    # Step 2: Verification Agent — uses key_b (different key, no sleep needed)
+    logger.info("[Pipeline] Step 2: Verification Agent (key B)")
+    verified, log2 = await verifier_agent(claims, topic, key_b, search_results)
     pipeline_log.append(log2)
     yield {"event": "agent_complete", "data": json.dumps(log2)}
 
-    contra_count = sum(1 for f in flags if f.get("flag_type") == "direct_contradiction")
-    unsub_count = sum(1 for f in flags if f.get("flag_type") == "unsubstantiated")
-    log3 = {"agent": "contradiction", "status": "done", "message": f"{len(flags)} issues flagged ({contra_count} contradictions, {unsub_count} unsubstantiated)", "duration": 0.8}
+    # Step 3: Contradiction Detector — uses key_b
+    logger.info("[Pipeline] Step 3: Contradiction Detector (key B)")
+    flags, log3 = await contradiction_agent(verified, topic, key_b)
     pipeline_log.append(log3)
     yield {"event": "agent_complete", "data": json.dumps(log3)}
 
-    # Algorithmic confidence for each claim
-    for claim in claims:
+    # Step 4: Algorithmic confidence (no LLM call — pure calculation)
+    for claim in verified:
         supp = claim.get("supporting_sources", [])
         contra = claim.get("contradicting_sources", [])
         algo_conf = calculate_claim_confidence(claim, flags, supp, contra)
@@ -668,12 +611,14 @@ Extract 4-6 claims. For each hallucination entry, only include claims that have 
             "source_reliability": round(sum(get_source_tier(s) for s in supp) / max(1, len(supp)), 2),
         }
 
-    log4 = {"agent": "synthesizer", "status": "done", "message": "Report compiled with citation-backed confidence scores", "duration": 0.5}
+    # Step 5: Synthesizer Agent — uses key_a
+    logger.info("[Pipeline] Step 5: Synthesizer Agent (key A)")
+    report_data, log4 = await synthesizer_agent(topic, verified, flags, key_a)
     pipeline_log.append(log4)
     yield {"event": "agent_complete", "data": json.dumps(log4)}
 
-    if claims:
-        overall_confidence = round(sum(c.get("confidence", 0.5) for c in claims) / len(claims), 2)
+    if verified:
+        overall_confidence = round(sum(c.get("confidence", 0.5) for c in verified) / len(verified), 2)
     else:
         overall_confidence = 0.5
 
@@ -682,9 +627,9 @@ Extract 4-6 claims. For each hallucination entry, only include claims that have 
     report = {
         "topic": topic,
         "overall_confidence": overall_confidence,
-        "summary": data.get("summary", ""),
-        "confidence_reasoning": data.get("confidence_reasoning", ""),
-        "claims": claims,
+        "summary": report_data.get("summary", ""),
+        "confidence_reasoning": report_data.get("confidence_reasoning", ""),
+        "claims": verified,
         "hallucinations": flags,
         "pipeline_log": pipeline_log,
         "total_duration": total_duration,
@@ -703,7 +648,7 @@ async def research(request: ResearchRequest):
 
     if request.stream:
         async def event_generator():
-            async for event in run_pipeline(request.topic, api_key):
+            async for event in run_pipeline(request.topic, api_key, request.api_key_2):
                 yield f"event: {event['event']}\ndata: {event['data']}\n\n"
 
         return StreamingResponse(
@@ -719,7 +664,7 @@ async def research(request: ResearchRequest):
     # Non-streaming: collect all events and return final result
     try:
         result = None
-        async for event in run_pipeline(request.topic, api_key):
+        async for event in run_pipeline(request.topic, api_key, request.api_key_2):
             if event["event"] == "complete":
                 result = json.loads(event["data"])
 
@@ -771,11 +716,16 @@ async def batch_verify(request: BatchRequest):
 @app.on_event("startup")
 async def startup_check():
     api_key = os.getenv("GROQ_API_KEY")
+    api_key_2 = os.getenv("GROQ_API_KEY_2")
     brave_key = os.getenv("BRAVE_API_KEY")
     if not api_key:
         logger.error("GROQ_API_KEY not set — pipeline will fail")
     else:
-        logger.info("Groq API key configured")
+        logger.info("Groq API key A configured")
+    if api_key_2:
+        logger.info("Groq API key B configured (dual-key mode)")
+    else:
+        logger.info("GROQ_API_KEY_2 not set — using single-key mode")
     if brave_key:
         logger.info("Brave Search API configured (primary search)")
     else:
@@ -785,17 +735,18 @@ async def startup_check():
 @app.get("/api/health")
 async def health():
     api_key = os.getenv("GROQ_API_KEY")
+    api_key_2 = os.getenv("GROQ_API_KEY_2")
     brave_key = os.getenv("BRAVE_API_KEY")
-    gemini_key = os.getenv("GEMINI_API_KEY")
     return {
         "status": "ok",
         "service": "Quorum",
-        "version": "4.0.0",
+        "version": "4.1.0",
         "providers": {
             "groq": bool(api_key),
-            "gemini": bool(gemini_key),
+            "groq_key_b": bool(api_key_2),
         },
         "api_key_configured": bool(api_key),
+        "dual_key_mode": bool(api_key_2),
         "search_provider": "brave" if brave_key else "duckduckgo",
         "pipeline_agents": ["researcher", "verifier", "contradiction", "synthesizer"],
     }
@@ -804,40 +755,25 @@ async def health():
 @app.get("/api/test-llm")
 async def test_llm():
     groq_key = os.getenv("GROQ_API_KEY")
-    gemini_key = os.getenv("GEMINI_API_KEY")
+    groq_key_2 = os.getenv("GROQ_API_KEY_2")
     results = {}
 
-    if groq_key:
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                resp = await client.post(
-                    "https://api.groq.com/openai/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
-                    json={"model": "llama-3.1-8b-instant", "max_tokens": 50, "messages": [{"role": "user", "content": "Say OK"}]},
-                )
-                results["groq"] = {"status": resp.status_code, "ok": resp.status_code == 200}
-                if resp.status_code != 200:
-                    results["groq"]["error"] = resp.text[:300]
-        except Exception as e:
-            results["groq"] = {"status": "error", "error": str(e)[:300]}
-    else:
-        results["groq"] = {"status": "no_key"}
-
-    if gemini_key:
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                resp = await client.post(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={gemini_key}",
-                    headers={"Content-Type": "application/json"},
-                    json={"contents": [{"parts": [{"text": "Say OK"}]}], "generationConfig": {"maxOutputTokens": 50}},
-                )
-                results["gemini"] = {"status": resp.status_code, "ok": resp.status_code == 200}
-                if resp.status_code != 200:
-                    results["gemini"]["error"] = resp.text[:300]
-        except Exception as e:
-            results["gemini"] = {"status": "error", "error": str(e)[:300]}
-    else:
-        results["gemini"] = {"status": "no_key"}
+    for label, key in [("groq", groq_key), ("groq_key_b", groq_key_2)]:
+        if key:
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    resp = await client.post(
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                        json={"model": "llama-3.1-8b-instant", "max_tokens": 50, "messages": [{"role": "user", "content": "Say OK"}]},
+                    )
+                    results[label] = {"status": resp.status_code, "ok": resp.status_code == 200}
+                    if resp.status_code != 200:
+                        results[label]["error"] = resp.text[:300]
+            except Exception as e:
+                results[label] = {"status": "error", "error": str(e)[:300]}
+        else:
+            results[label] = {"status": "no_key"}
 
     return results
 

@@ -192,7 +192,19 @@ function ClaimCard({ claim, index, hallucinationFlag }: ClaimCardProps) {
               {/* Primary source */}
               <div className="flex items-center gap-2 pt-1 text-xs text-text-secondary/50">
                 <ExternalLink className="w-3 h-3" aria-hidden="true" />
-                <span>Source: <span className="text-text-secondary/80">{claim.source}</span></span>
+                <span>Source: </span>
+                {claim.source_url ? (
+                  <a
+                    href={claim.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-text-secondary/80 hover:text-accent underline underline-offset-2 decoration-text-secondary/30 hover:decoration-accent/50 transition-colors"
+                  >
+                    {claim.source}
+                  </a>
+                ) : (
+                  <span className="text-text-secondary/80">{claim.source}</span>
+                )}
               </div>
             </div>
           </motion.div>
