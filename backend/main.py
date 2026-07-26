@@ -129,19 +129,18 @@ def clean_json(text: str) -> str:
 
 
 async def call_llm(system_prompt: str, user_prompt: str, api_key: str) -> str:
-    groq_key = os.getenv("GROQ_API_KEY")
-    if not groq_key:
-        raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="No Groq API key provided")
 
     for attempt in range(3):
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
+            async with httpx.AsyncClient(timeout=45.0) as client:
                 response = await client.post(
                     "https://api.groq.com/openai/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                     json={
                         "model": "llama-3.1-8b-instant",
-                        "max_tokens": 4096,
+                        "max_tokens": 2048,
                         "temperature": 0.2,
                         "messages": [
                             {"role": "system", "content": system_prompt},
@@ -155,15 +154,17 @@ async def call_llm(system_prompt: str, user_prompt: str, api_key: str) -> str:
                         return data["choices"][0]["message"]["content"]
                     logger.warning("Groq returned empty choices")
                 elif response.status_code == 429:
-                    wait = 10 + attempt * 15
-                    logger.warning(f"Groq rate limited (attempt {attempt+1}/3), waiting {wait}s")
+                    wait = 5 + attempt * 5
+                    logger.warning(f"Groq rate limited on key ...{api_key[-6:]} (attempt {attempt+1}/3), waiting {wait}s")
                     await asyncio.sleep(wait)
                 else:
-                    logger.warning(f"Groq HTTP {response.status_code}")
+                    logger.warning(f"Groq HTTP {response.status_code} on key ...{api_key[-6:]}")
         except Exception as e:
-            logger.warning(f"Groq failed: {e}")
+            logger.warning(f"Groq call failed (attempt {attempt+1}/3): {type(e).__name__}")
+            if attempt < 2:
+                await asyncio.sleep(3)
 
-    raise HTTPException(status_code=502, detail="Groq rate limited — please wait a moment and try again")
+    raise HTTPException(status_code=502, detail="All LLM retries exhausted — please try again")
 
 
 def parse_agent_json(raw: str, agent_name: str) -> list | dict:
@@ -487,28 +488,23 @@ async def verifier_agent(claims: list[dict], topic: str, api_key: str, search_re
 
     system = (
         "You are the Cross-Verification Agent in Quorum's multi-agent pipeline. "
-        "Your job is to independently verify each claim against multiple reliable sources. "
-        "When web search results are provided, use them for cross-verification. "
-        "You must provide detailed 'reasoning' for each verification decision. "
+        "Independently verify each claim against reliable sources. "
         "Track supporting AND contradicting sources separately. "
-        "Return ONLY valid JSON — no markdown, no explanation outside the JSON."
+        "Return ONLY valid JSON — no markdown."
     )
     prompt = f'''Verify these claims about: "{safe_topic}"
 
-Claims to verify:
 {claims_text}
 {search_context}
 
 For EACH claim:
-1. Cross-reference against multiple reliable sources
-2. Determine: verified, partially_verified, unverified, or contradicted
-3. List specific supporting sources (institution names, publications)
-4. List specific contradicting sources if any exist
-5. Adjust confidence based on source agreement
-6. Provide detailed reasoning explaining your verification decision
+- verification_status: verified, partially_verified, unverified, or contradicted
+- confidence: adjusted 0.0-1.0 based on source agreement
+- supporting_sources: list of source names
+- contradicting_sources: list of source names
+- reasoning: 1 sentence explanation
 
-Return a JSON array with exactly these fields per claim:
-claim, source, source_url, confidence (0.0-1.0), verification_status, supporting_sources (array of source names), contradicting_sources (array of source names), reasoning (1-2 sentences explaining verification)'''
+Return JSON array with: claim, source, source_url, confidence, verification_status, supporting_sources, contradicting_sources, reasoning'''
 
     start = time.time()
     result = await call_llm(system, prompt, api_key)
@@ -594,36 +590,25 @@ async def synthesizer_agent(
 ) -> tuple[dict, dict]:
     safe_topic = sanitize_input(topic)
     claims_text = "\n".join([
-        f"- {c.get('claim', '')} [Status: {c.get('verification_status', 'unknown')}, Confidence: {c.get('confidence', 0)}, Reasoning: {c.get('reasoning', 'N/A')[:100]}]"
+        f"- {c.get('claim', '')} [{c.get('verification_status', 'unknown')}, {c.get('confidence', 0)}]"
         for c in verified_claims
     ])
     flag_data = [h for h in hallucinations if h.get("flag_type") != "none"]
 
     system = (
-        "You are the Synthesis and Confidence Agent in Quorum's multi-agent pipeline. "
-        "Your job is to compile a citation-backed report with accurate confidence scores. "
-        "The confidence scores have been ALREADY CALCULATED ALGORITHMICALLY — you must use them as provided. "
-        "Write a 3-5 sentence executive summary. "
-        "Return ONLY valid JSON — no markdown, no explanation outside the JSON."
+        "You are the Synthesis Agent in Quorum's multi-agent pipeline. "
+        "Write a 2-4 sentence executive summary of the verified claims. "
+        "Confidence scores are already calculated — do not change them. "
+        "Return ONLY valid JSON — no markdown."
     )
-    prompt = f'''Compile a report on: "{safe_topic}"
+    prompt = f'''Topic: "{safe_topic}"
 
-Verified Claims (with algorithmically calculated confidence):
-{claims_text}
+Claims: {claims_text}
+Flags: {json.dumps(flag_data) if flag_data else "none"}
 
-Flags: {json.dumps(flag_data)}
+Write a 2-4 sentence summary highlighting strongest findings and any concerns.
 
-Write a 3-5 sentence executive summary that:
-1. States the overall reliability of the research
-2. Highlights the strongest findings
-3. Notes the most contested or uncertain claims
-4. Provides actionable confidence guidance
-
-Return JSON with exactly these fields:
-{{
-  "summary": "detailed executive summary",
-  "confidence_reasoning": "1-2 sentence explanation of the confidence assessment"
-}}'''
+Return JSON: {{"summary": "...", "confidence_reasoning": "1-2 sentences"}}'''
 
     start = time.time()
     try:
@@ -651,62 +636,94 @@ async def run_pipeline(topic: str, api_key: str, api_key_2: str | None = None, a
 
     key_a = api_key       # Groq key A → Research + Synthesizer
     key_b = api_key_2 or api_key  # Groq key B → Verifier
-    key_c = api_key_3 or api_key  # Groq key C → Contradiction (falls back to A if not set)
+    key_c = api_key_3 or api_key  # Groq key C → Contradiction
 
     key_count = sum(1 for k in [api_key, api_key_2, api_key_3] if k)
     logger.info(f"[Pipeline] Using {key_count}-key mode")
 
     # Step 0: Web search
     logger.info(f"[Pipeline] Starting search for: {topic[:50]}")
-    search_results = await web_search(topic, max_results=5)
+    try:
+        search_results = await web_search(topic, max_results=5)
+    except Exception as e:
+        logger.error(f"[Pipeline] Search failed: {e}")
+        search_results = []
     logger.info(f"[Pipeline] Search returned {len(search_results)} results")
 
     # Step 1: Research Agent — uses key_a
     logger.info("[Pipeline] Step 1: Research Agent (key A)")
     yield {"event": "agent_start", "data": json.dumps({"agent": "researcher", "label": "Research", "message": "Searching web sources..."})}
-    claims, log1 = await research_agent(topic, key_a, search_results)
+    try:
+        claims, log1 = await research_agent(topic, key_a, search_results)
+    except Exception as e:
+        logger.error(f"[Pipeline] Research agent failed: {e}")
+        claims = [{"claim": f"Research failed for: {topic}", "source": "error", "confidence": 0.0, "verification_status": "unverified", "supporting_sources": [], "contradicting_sources": [], "reasoning": str(e)[:200]}]
+        log1 = {"agent": "researcher", "status": "error", "message": f"Research agent error: {type(e).__name__}", "duration": 0}
     pipeline_log.append(log1)
     yield {"event": "agent_complete", "data": json.dumps(log1)}
 
-    # Step 2: Verification Agent — uses key_b (different key, no sleep needed)
+    # Step 2: Verification Agent — uses key_b
     logger.info("[Pipeline] Step 2: Verification Agent (key B)")
     yield {"event": "agent_start", "data": json.dumps({"agent": "verifier", "label": "Verifier", "message": "Cross-checking claims against sources..."})}
-    verified, log2 = await verifier_agent(claims, topic, key_b, search_results)
+    try:
+        verified, log2 = await verifier_agent(claims, topic, key_b, search_results)
+    except Exception as e:
+        logger.error(f"[Pipeline] Verifier agent failed: {e}")
+        verified = claims  # fall back to unverified claims
+        for v in verified:
+            v.setdefault("verification_status", "unverified")
+            v.setdefault("supporting_sources", [])
+            v.setdefault("contradicting_sources", [])
+            v.setdefault("reasoning", f"Verification skipped: {type(e).__name__}")
+        log2 = {"agent": "verifier", "status": "error", "message": f"Verifier error: {type(e).__name__}", "duration": 0}
     pipeline_log.append(log2)
     yield {"event": "agent_complete", "data": json.dumps(log2)}
 
-    # Step 3: Contradiction Detector — uses key_c (dedicated key, avoids rate limits)
+    # Step 3: Contradiction Detector — uses key_c
     logger.info("[Pipeline] Step 3: Contradiction Detector (key C)")
     yield {"event": "agent_start", "data": json.dumps({"agent": "contradiction", "label": "Contradiction", "message": "Scanning for hallucinations and contradictions..."})}
     flags = []
-    for contra_attempt in range(2):
+    log3 = {"agent": "contradiction", "status": "done", "message": "No contradictions checked", "duration": 0}
+    try:
         flags, log3 = await contradiction_agent(verified, topic, key_c)
-        if isinstance(flags, list):
-            break
-        if contra_attempt == 0:
+        if not isinstance(flags, list):
             logger.warning("[Pipeline] Contradiction detector returned non-list, retrying...")
-            await asyncio.sleep(2)
+            flags, log3 = await contradiction_agent(verified, topic, key_c)
+            if not isinstance(flags, list):
+                flags = []
+    except Exception as e:
+        logger.error(f"[Pipeline] Contradiction agent failed: {e}")
+        flags = []
+        log3 = {"agent": "contradiction", "status": "error", "message": f"Contradiction error: {type(e).__name__}", "duration": 0}
     pipeline_log.append(log3)
     yield {"event": "agent_complete", "data": json.dumps(log3)}
 
     # Step 4: Algorithmic confidence (no LLM call — pure calculation with breakdown)
-    for claim in verified:
-        supp = claim.get("supporting_sources", [])
-        contra = claim.get("contradicting_sources", [])
-        bd = calculate_claim_confidence_breakdown(claim, flags, supp, contra)
-        claim["confidence"] = bd["final_score"]
-        claim["confidence_breakdown"] = bd["breakdown"]
-        claim["agent_scores"] = {
-            "researcher": round(claim.get("confidence", 0.5), 2),
-            "verifier": round(bd["final_score"], 2),
-            "source_agreement": bd["breakdown"]["source_agreement"]["contribution"],
-            "source_reliability": bd["breakdown"]["source_reliability"]["contribution"],
-        }
+    try:
+        for claim in verified:
+            supp = claim.get("supporting_sources", [])
+            contra = claim.get("contradicting_sources", [])
+            bd = calculate_claim_confidence_breakdown(claim, flags, supp, contra)
+            claim["confidence"] = bd["final_score"]
+            claim["confidence_breakdown"] = bd["breakdown"]
+            claim["agent_scores"] = {
+                "researcher": round(claim.get("confidence", 0.5), 2),
+                "verifier": round(bd["final_score"], 2),
+                "source_agreement": bd["breakdown"]["source_agreement"]["contribution"],
+                "source_reliability": bd["breakdown"]["source_reliability"]["contribution"],
+            }
+    except Exception as e:
+        logger.error(f"[Pipeline] Confidence calculation failed: {e}")
 
     # Step 5: Synthesizer Agent — uses key_a
     logger.info("[Pipeline] Step 5: Synthesizer Agent (key A)")
     yield {"event": "agent_start", "data": json.dumps({"agent": "synthesizer", "label": "Synthesizer", "message": "Compiling citation-backed report..."})}
-    report_data, log4 = await synthesizer_agent(topic, verified, flags, key_a)
+    try:
+        report_data, log4 = await synthesizer_agent(topic, verified, flags, key_a)
+    except Exception as e:
+        logger.error(f"[Pipeline] Synthesizer agent failed: {e}")
+        report_data = {"summary": f"Report compilation failed: {type(e).__name__}. Raw claims are still available.", "confidence_reasoning": "Unable to generate reasoning."}
+        log4 = {"agent": "synthesizer", "status": "error", "message": f"Synthesizer error: {type(e).__name__}", "duration": 0}
     pipeline_log.append(log4)
     yield {"event": "agent_complete", "data": json.dumps(log4)}
 
@@ -741,8 +758,13 @@ async def research(request: ResearchRequest):
 
     if request.stream:
         async def event_generator():
-            async for event in run_pipeline(request.topic, api_key, request.api_key_2, request.api_key_3):
-                yield f"event: {event['event']}\ndata: {event['data']}\n\n"
+            try:
+                async for event in run_pipeline(request.topic, api_key, request.api_key_2, request.api_key_3):
+                    yield f"event: {event['event']}\ndata: {event['data']}\n\n"
+            except Exception as e:
+                logger.error(f"SSE generator error: {e}")
+                error_event = json.dumps({"status": "error", "error": str(e)[:200]})
+                yield f"event: error\ndata: {error_event}\n\n"
 
         return StreamingResponse(
             event_generator(),
