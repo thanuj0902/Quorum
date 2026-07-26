@@ -3,6 +3,7 @@ import re
 import json
 import time
 import asyncio
+import random
 import logging
 from collections import defaultdict
 from fastapi import FastAPI, HTTPException, Request
@@ -18,7 +19,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("quorum")
 
-app = FastAPI(title="Quorum", version="2.4.0", description="Multi-agent AI fact-verification system")
+app = FastAPI(title="Quorum", version="3.0.0", description="Multi-agent AI fact-verification system")
 
 MAX_TOPIC_LENGTH = 500
 MAX_RETRIES = 2
@@ -673,7 +674,6 @@ Extract 4-6 claims. For each hallucination entry, only include claims that have 
         raise
 
     # Emit remaining agent events with realistic timing
-    import random
     t1 = round(random.uniform(0.8, 2.0), 2)
     t2 = round(random.uniform(1.0, 3.0), 2)
     t3 = round(random.uniform(0.5, 1.5), 2)
@@ -831,7 +831,7 @@ async def health():
     return {
         "status": "ok",
         "service": "Quorum",
-        "version": "2.4.0",
+        "version": "3.0.0",
         "providers": {
             "groq": bool(api_key),
             "gemini": bool(gemini_key),
