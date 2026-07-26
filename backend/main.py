@@ -121,7 +121,6 @@ def clean_json(text: str) -> str:
 async def call_llm(system_prompt: str, user_prompt: str, api_key: str, preferred_provider: str = "auto") -> str:
     errors = []
 
-    # Build provider order based on preference
     if preferred_provider == "gemini":
         providers = ["gemini", "groq"]
     elif preferred_provider == "groq":
@@ -133,6 +132,7 @@ async def call_llm(system_prompt: str, user_prompt: str, api_key: str, preferred
         if provider == "groq":
             groq_key = os.getenv("GROQ_API_KEY")
             if not groq_key:
+                errors.append("Groq: no API key")
                 continue
             for attempt in range(2):
                 try:
@@ -154,6 +154,8 @@ async def call_llm(system_prompt: str, user_prompt: str, api_key: str, preferred
                             data = response.json()
                             if "choices" in data and data["choices"]:
                                 return data["choices"][0]["message"]["content"]
+                            else:
+                                errors.append("Groq: empty response")
                         elif response.status_code == 429:
                             retry_after = int(response.headers.get("retry-after", 5 + attempt * 10))
                             logger.warning(f"Groq rate limited (attempt {attempt+1}/2), waiting {retry_after}s")
@@ -163,10 +165,13 @@ async def call_llm(system_prompt: str, user_prompt: str, api_key: str, preferred
                 except Exception as e:
                     errors.append(f"Groq: {e}")
                     logger.warning(f"Groq failed: {e}")
+            if not any("Groq:" in e for e in errors):
+                errors.append("Groq: rate limited after retries")
 
         elif provider == "gemini":
             gemini_key = os.getenv("GEMINI_API_KEY")
             if not gemini_key:
+                errors.append("Gemini: no API key")
                 continue
             for attempt in range(2):
                 try:
@@ -192,6 +197,8 @@ async def call_llm(system_prompt: str, user_prompt: str, api_key: str, preferred
                 except Exception as e:
                     errors.append(f"Gemini: {e}")
                     logger.warning(f"Gemini failed: {e}")
+            if not any("Gemini:" in e for e in errors):
+                errors.append("Gemini: rate limited after retries")
 
     logger.error(f"All providers failed: {errors}")
     raise HTTPException(status_code=502, detail=f"Providers failed: {'; '.join(errors)}")
