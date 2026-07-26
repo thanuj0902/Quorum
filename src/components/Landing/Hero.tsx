@@ -36,7 +36,7 @@ const agentIcons = [
 
 export default function Hero({ onStart }: HeroProps) {
   return (
-    <section className="relative min-h-screen flex flex-col items-center justify-center px-6 overflow-hidden" aria-labelledby="hero-heading">
+    <section className="relative min-h-screen flex flex-col items-center justify-center px-6 pt-28 pb-16 overflow-hidden" aria-labelledby="hero-heading">
       {/* Animated gradient orbs */}
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
         <motion.div
