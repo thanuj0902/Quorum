@@ -122,6 +122,45 @@ function ClaimCard({ claim, index, hallucinationFlag }: ClaimCardProps) {
                 </div>
               )}
 
+              {/* Confidence Factor Breakdown */}
+              {claim.confidence_breakdown && (
+                <div className="p-4 rounded-xl border" style={{ background: 'rgba(124,58,237,0.04)', borderColor: 'rgba(124,58,237,0.1)' }}>
+                  <p className="text-[11px] text-accent/70 font-semibold mb-3 uppercase tracking-wider">Confidence Factor Breakdown</p>
+                  <div className="space-y-2.5">
+                    {[
+                      { label: 'Source Agreement', factor: claim.confidence_breakdown.source_agreement, color: '#34D399' },
+                      { label: 'Source Reliability', factor: claim.confidence_breakdown.source_reliability, color: '#60A5FA' },
+                      { label: 'Contradiction Check', factor: claim.confidence_breakdown.contradiction_penalty, color: '#FBBF24' },
+                      { label: 'Base Score', factor: claim.confidence_breakdown.base_score, color: '#A78BFA' },
+                    ].map(({ label, factor, color }) => (
+                      <div key={label}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[11px] text-text-secondary/70">{label}</span>
+                          <span className="text-[11px] font-mono" style={{ color }}>
+                            {Math.round(factor.value * 100)}% x {Math.round(factor.weight * 100)}% weight = {Math.round(factor.contribution * 100)}%
+                          </span>
+                        </div>
+                        <div className="h-1.5 rounded-full" style={{ background: '#222230' }}>
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{ width: `${factor.contribution * 100}%`, background: color }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                    {claim.confidence_breakdown.status_adjustment !== 0 && (
+                      <div className="flex items-center justify-between pt-1 border-t" style={{ borderColor: '#222230' }}>
+                        <span className="text-[11px] text-text-secondary/70">Status Adjustment</span>
+                        <span className={`text-[11px] font-mono ${claim.confidence_breakdown.status_adjustment > 0 ? 'text-green' : 'text-red'}`}>
+                          {claim.confidence_breakdown.status_adjustment > 0 ? '+' : ''}{Math.round(claim.confidence_breakdown.status_adjustment * 100)}%
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-text-secondary/40 mt-3 font-mono">{claim.confidence_breakdown.formula}</p>
+                </div>
+              )}
+
               {/* Contradiction / Hallucination Flag */}
               {hallucinationFlag && hallucinationFlag.flag_type !== 'none' && (
                 <div className={`p-4 rounded-xl border ${hallucinationFlag.flag_type === 'direct_contradiction' ? 'border-yellow/20' : 'border-red/20'}`}

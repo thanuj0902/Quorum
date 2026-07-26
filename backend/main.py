@@ -28,6 +28,10 @@ RATE_LIMIT_MAX = 5
 
 rate_limit_store: dict[str, list[float]] = defaultdict(list)
 
+# In-memory report store for shareable links (keyed by report ID)
+report_store: dict[str, dict] = {}
+REPORT_STORE_MAX = 200  # max reports to keep in memory
+
 
 GROQ_API_KEY_2 = os.getenv("GROQ_API_KEY_2", "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")
 
@@ -312,6 +316,17 @@ def calculate_claim_confidence(
     contradicting_sources: list[str],
 ) -> float:
     """Algorithmic confidence calculation based on structured factors."""
+    breakdown = calculate_claim_confidence_breakdown(claim, hallucination_flags, supporting_sources, contradicting_sources)
+    return breakdown["final_score"]
+
+
+def calculate_claim_confidence_breakdown(
+    claim: dict,
+    hallucination_flags: list[dict],
+    supporting_sources: list[str],
+    contradicting_sources: list[str],
+) -> dict:
+    """Algorithmic confidence with full factor breakdown for UI display."""
     # Factor 1: Source agreement rate
     total_sources = len(supporting_sources) + len(contradicting_sources)
     if total_sources > 0:
@@ -351,16 +366,31 @@ def calculate_claim_confidence(
     }
     status_adj = status_bonus.get(claim.get("verification_status", "unverified"), 0)
 
-    # Weighted formula
-    raw_score = (
-        agreement_rate * 0.40
-        + avg_reliability * 0.25
-        + (1 - contradiction_penalty) * 0.25
-        + 0.50 * 0.10  # base score
-    )
-    raw_score += status_adj
+    # Weighted contributions
+    w_agreement = 0.40
+    w_reliability = 0.25
+    w_contradiction = 0.25
+    w_base = 0.10
 
-    return max(0.05, min(0.99, round(raw_score, 2)))
+    contrib_agreement = agreement_rate * w_agreement
+    contrib_reliability = avg_reliability * w_reliability
+    contrib_contradiction = (1 - contradiction_penalty) * w_contradiction
+    contrib_base = 0.50 * w_base
+
+    raw_score = contrib_agreement + contrib_reliability + contrib_contradiction + contrib_base + status_adj
+    final_score = max(0.05, min(0.99, round(raw_score, 2)))
+
+    return {
+        "final_score": final_score,
+        "breakdown": {
+            "source_agreement": {"value": round(agreement_rate, 2), "weight": w_agreement, "contribution": round(contrib_agreement, 3)},
+            "source_reliability": {"value": round(avg_reliability, 2), "weight": w_reliability, "contribution": round(contrib_reliability, 3)},
+            "contradiction_penalty": {"value": round(contradiction_penalty, 2), "weight": w_contradiction, "contribution": round(contrib_contradiction, 3)},
+            "base_score": {"value": 0.50, "weight": w_base, "contribution": round(contrib_base, 3)},
+            "status_adjustment": round(status_adj, 3),
+            "formula": f"({agreement_rate:.2f} x {w_agreement}) + ({avg_reliability:.2f} x {w_reliability}) + ({1-contradiction_penalty:.2f} x {w_contradiction}) + (0.50 x {w_base}) + {status_adj:+.3f} = {final_score}",
+        },
+    }
 
 
 # --- Agents ---
@@ -613,17 +643,18 @@ async def run_pipeline(topic: str, api_key: str, api_key_2: str | None = None):
     pipeline_log.append(log3)
     yield {"event": "agent_complete", "data": json.dumps(log3)}
 
-    # Step 4: Algorithmic confidence (no LLM call — pure calculation)
+    # Step 4: Algorithmic confidence (no LLM call — pure calculation with breakdown)
     for claim in verified:
         supp = claim.get("supporting_sources", [])
         contra = claim.get("contradicting_sources", [])
-        algo_conf = calculate_claim_confidence(claim, flags, supp, contra)
-        claim["confidence"] = algo_conf
+        bd = calculate_claim_confidence_breakdown(claim, flags, supp, contra)
+        claim["confidence"] = bd["final_score"]
+        claim["confidence_breakdown"] = bd["breakdown"]
         claim["agent_scores"] = {
             "researcher": round(claim.get("confidence", 0.5), 2),
-            "verifier": round(algo_conf, 2),
-            "source_agreement": round(len(supp) / max(1, len(supp) + len(contra)), 2),
-            "source_reliability": round(sum(get_source_tier(s) for s in supp) / max(1, len(supp)), 2),
+            "verifier": round(bd["final_score"], 2),
+            "source_agreement": bd["breakdown"]["source_agreement"]["contribution"],
+            "source_reliability": bd["breakdown"]["source_reliability"]["contribution"],
         }
 
     # Step 5: Synthesizer Agent — uses key_a
@@ -795,6 +826,36 @@ async def test_search():
     loop = asyncio.get_event_loop()
     results = await loop.run_in_executor(None, _ddg_search_sync, "climate change", 3)
     return {"count": len(results), "results": results}
+
+
+# --- Server-side report storage for cross-device shareable links ---
+
+class StoreReportRequest(BaseModel):
+    report_id: str = Field(..., min_length=1, max_length=50)
+    report: dict = Field(...)
+
+
+@app.post("/api/reports")
+async def store_report(request: StoreReportRequest):
+    if len(report_store) >= REPORT_STORE_MAX:
+        # Evict oldest entry
+        oldest_key = next(iter(report_store))
+        del report_store[oldest_key]
+
+    report_store[request.report_id] = {
+        "report": request.report,
+        "stored_at": time.time(),
+    }
+    logger.info(f"[Reports] Stored report {request.report_id} ({len(report_store)} total)")
+    return {"status": "stored", "report_id": request.report_id}
+
+
+@app.get("/api/reports/{report_id}")
+async def get_report(report_id: str):
+    entry = report_store.get(report_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return {"status": "success", "report": entry["report"]}
 
 
 if __name__ == "__main__":

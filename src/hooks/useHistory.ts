@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import type { HistoryEntry, VerificationReport } from '../types'
 
 const STORAGE_KEY = 'quorum_history'
+const API_BASE = import.meta.env.VITE_API_URL || 'https://quorum-production-4df3.up.railway.app'
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
@@ -24,6 +25,31 @@ function saveHistory(entries: HistoryEntry[]): void {
   }
 }
 
+async function storeReportOnServer(reportId: string, report: VerificationReport): Promise<void> {
+  try {
+    await fetch(`${API_BASE}/api/reports`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ report_id: reportId, report }),
+    })
+  } catch {
+    // Server storage is best-effort
+  }
+}
+
+export async function fetchReportFromServer(reportId: string): Promise<VerificationReport | null> {
+  try {
+    const resp = await fetch(`${API_BASE}/api/reports/${reportId}`)
+    if (resp.ok) {
+      const data = await resp.json()
+      return data.report || null
+    }
+  } catch {
+    // Fall back to null
+  }
+  return null
+}
+
 export function useHistory() {
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory())
 
@@ -44,6 +70,9 @@ export function useHistory() {
       timestamp: Date.now(),
       fullReport: report,
     }
+
+    // Store on server for cross-device shareable links
+    storeReportOnServer(entry.id, report)
 
     setHistory(prev => {
       const next = [entry, ...prev]

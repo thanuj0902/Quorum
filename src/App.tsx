@@ -3,9 +3,9 @@ import { AnimatePresence, motion } from 'framer-motion'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import ToastContainer from './components/ui/Toast'
 import { usePipeline } from './hooks/usePipeline'
-import { useHistory } from './hooks/useHistory'
+import { useHistory, fetchReportFromServer } from './hooks/useHistory'
 import { useToast } from './hooks/useToast'
-import type { AppView } from './types'
+import type { AppView, VerificationReport } from './types'
 
 const LandingView = lazy(() => import('./components/Landing/LandingView'))
 const PipelineView = lazy(() => import('./components/Pipeline/PipelineView'))
@@ -27,6 +27,7 @@ function LoadingSpinner() {
 export default function App() {
   const [view, setView] = useState<AppView>('landing')
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
+  const [serverReport, setServerReport] = useState<VerificationReport | null>(null)
   const [linkCopied, setLinkCopied] = useState(false)
 
   const { phase, pipelineState, report, error, runLivePipeline, runBatchPipeline } = usePipeline()
@@ -38,6 +39,15 @@ export default function App() {
     if (hash) {
       setSelectedReportId(hash)
       setView('report')
+      // Try localStorage first, then server
+      const local = getEntry(hash)
+      if (!local) {
+        fetchReportFromServer(hash).then(serverData => {
+          if (serverData) {
+            setServerReport(serverData)
+          }
+        })
+      }
     }
   }, [])
 
@@ -78,6 +88,7 @@ export default function App() {
   }, [])
 
   const selectedEntry = selectedReportId ? getEntry(selectedReportId) : undefined
+  const activeReport = selectedEntry?.fullReport || serverReport
 
   return (
     <ErrorBoundary>
@@ -166,7 +177,7 @@ export default function App() {
               </motion.div>
             )}
 
-            {view === 'report' && selectedEntry && (
+            {view === 'report' && activeReport && (
               <motion.div
                 key="report"
                 initial={{ opacity: 0 }}
@@ -175,7 +186,7 @@ export default function App() {
                 transition={{ duration: 0.3 }}
               >
                 <ReportView
-                  report={selectedEntry.fullReport}
+                  report={activeReport}
                   onBack={handleReportBack}
                   onCopyLink={handleCopyLink}
                   linkCopied={linkCopied}
@@ -183,7 +194,7 @@ export default function App() {
               </motion.div>
             )}
 
-            {view === 'report' && !selectedEntry && (
+            {view === 'report' && !activeReport && (
               <motion.div
                 key="report-not-found"
                 initial={{ opacity: 0 }}
@@ -193,13 +204,22 @@ export default function App() {
                 className="min-h-screen flex items-center justify-center bg-base"
               >
                 <div className="text-center space-y-4">
-                  <p className="text-text-secondary text-sm">Report not found or may have been deleted.</p>
-                  <button
-                    onClick={() => { setView('landing'); window.location.hash = '' }}
-                    className="px-5 py-2.5 bg-accent text-white text-sm font-medium rounded-xl hover:bg-accent/90 transition-colors"
-                  >
-                    Back to Home
-                  </button>
+                  {serverReport === null && selectedReportId ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-accent/30 border-t-accent rounded-full animate-spin mx-auto" />
+                      <p className="text-text-secondary text-sm">Loading report from server...</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-text-secondary text-sm">Report not found or may have been deleted.</p>
+                      <button
+                        onClick={() => { setView('landing'); window.location.hash = '' }}
+                        className="px-5 py-2.5 bg-accent text-white text-sm font-medium rounded-xl hover:bg-accent/90 transition-colors"
+                      >
+                        Back to Home
+                      </button>
+                    </>
+                  )}
                 </div>
               </motion.div>
             )}

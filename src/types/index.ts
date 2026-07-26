@@ -8,11 +8,27 @@ export interface Agent {
   status: string
 }
 
+export interface ConfidenceFactor {
+  value: number
+  weight: number
+  contribution: number
+}
+
+export interface ConfidenceBreakdown {
+  source_agreement: ConfidenceFactor
+  source_reliability: ConfidenceFactor
+  contradiction_penalty: ConfidenceFactor
+  base_score: ConfidenceFactor
+  status_adjustment: number
+  formula: string
+}
+
 export interface Claim {
   claim: string
   source: string
   source_url?: string
   confidence: number
+  confidence_breakdown?: ConfidenceBreakdown
   verification_status: 'verified' | 'partially_verified' | 'unverified' | 'contradicted'
   supporting_sources: string[]
   contradicting_sources: string[]
