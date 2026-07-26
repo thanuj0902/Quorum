@@ -263,21 +263,104 @@ async def brave_search(query: str, max_results: int = 5) -> list[dict]:
         return []
 
 
-async def web_search(query: str, max_results: int = 5) -> list[dict]:
-    """Guaranteed web search. DuckDuckGo (always free, no key) + Brave (optional, better quality)."""
-    # Try DuckDuckGo first (always works, no API key)
-    results = await duckduckgo_search(query, max_results)
-    if results:
-        logger.info(f"Search OK (DuckDuckGo): {len(results)} results for '{query[:50]}'")
-        return results
+async def wikipedia_search(query: str, max_results: int = 3) -> list[dict]:
+    """Wikipedia API search — authoritative encyclopedia source, always free, no key."""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            # Search for matching articles
+            search_resp = await client.get(
+                "https://en.wikipedia.org/w/api.php",
+                params={
+                    "action": "query",
+                    "list": "search",
+                    "srsearch": query,
+                    "srlimit": max_results,
+                    "format": "json",
+                },
+            )
+            search_resp.raise_for_status()
+            search_data = search_resp.json()
 
-    # Fallback: Brave Search (free tier, needs key)
+            results = []
+            for item in search_data.get("query", {}).get("search", []):
+                title = item.get("title", "")
+                snippet = re.sub(r'<[^>]+>', '', item.get("snippet", ""))  # strip HTML tags
+                page_url = f"https://en.wikipedia.org/wiki/{title.replace(' ', '_')}"
+
+                # Fetch page extract for richer content
+                try:
+                    extract_resp = await client.get(
+                        "https://en.wikipedia.org/w/api.php",
+                        params={
+                            "action": "query",
+                            "titles": title,
+                            "prop": "extracts",
+                            "exintro": True,
+                            "explaintext": True,
+                            "exchars": 500,
+                            "format": "json",
+                        },
+                    )
+                    extract_resp.raise_for_status()
+                    pages = extract_resp.json().get("query", {}).get("pages", {})
+                    extract = ""
+                    for page in pages.values():
+                        extract = page.get("extract", "")[:500]
+                except Exception:
+                    extract = snippet
+
+                results.append({
+                    "title": f"Wikipedia: {title}",
+                    "url": page_url,
+                    "content": extract or snippet,
+                    "score": 0.85,  # Wikipedia is high-authority
+                })
+
+            if results:
+                logger.info(f"Search OK (Wikipedia): {len(results)} results for '{query[:50]}'")
+            return results
+    except Exception as e:
+        logger.warning(f"Wikipedia search error: {e}")
+        return []
+
+
+async def web_search(query: str, max_results: int = 5) -> list[dict]:
+    """Multi-source search: DuckDuckGo + Wikipedia (both free, no keys). Results merged and deduplicated."""
+    # Run both searches in parallel
+    ddg_task = duckduckgo_search(query, max_results)
+    wiki_task = wikipedia_search(query, max_results=3)
+    ddg_results, wiki_results = await asyncio.gather(ddg_task, wiki_task, return_exceptions=True)
+
+    # Normalize exceptions to empty lists
+    if isinstance(ddg_results, Exception):
+        logger.error(f"DuckDuckGo search error: {ddg_results}")
+        ddg_results = []
+    if isinstance(wiki_results, Exception):
+        logger.error(f"Wikipedia search error: {wiki_results}")
+        wiki_results = []
+
+    # Merge: Wikipedia results first (authoritative), then DuckDuckGo
+    all_results = wiki_results + ddg_results
+
+    # Deduplicate by URL
+    seen_urls = set()
+    unique_results = []
+    for r in all_results:
+        url = r.get("url", "")
+        if url and url not in seen_urls:
+            seen_urls.add(url)
+            unique_results.append(r)
+
+    if unique_results:
+        logger.info(f"Search OK: {len(wiki_results)} Wikipedia + {len(ddg_results)} DuckDuckGo = {len(unique_results)} unique results for '{query[:50]}'")
+        return unique_results[:max_results + 2]  # give a few extra for better coverage
+
+    # Fallback: Brave Search (optional)
     results = await brave_search(query, max_results)
     if results:
-        logger.info(f"Search OK (Brave): {len(results)} results for '{query[:50]}'")
+        logger.info(f"Search OK (Brave fallback): {len(results)} results for '{query[:50]}'")
         return results
 
-    # Last resort: return empty but log error
     logger.error(f"Search FAILED: no results from any provider for '{query[:50]}'")
     return []
 
@@ -301,6 +384,8 @@ def get_source_tier(source_name: str) -> float:
         return SOURCE_TIER["peer_reviewed"]
     if any(k in name_lower for k in ["fda", "cdc", "nih", "nhs", "who", "government"]):
         return SOURCE_TIER["government"]
+    if any(k in name_lower for k in ["wikipedia"]):
+        return 0.90  # Wikipedia: high-authority encyclopedia
     if any(k in name_lower for k in ["reuters", "ap ", "bbc", "nyt", "washington post", "guardian", "ft "]):
         return SOURCE_TIER["major_news"]
     if any(k in name_lower for k in ["mckinsey", "deloitte", "pwc", "gartner", "bloomberg", "forbes", "wsj"]):
@@ -720,6 +805,36 @@ async def run_pipeline(topic: str, api_key: str, api_key_2: str | None = None, a
     else:
         overall_confidence = 0.5
 
+    # Aggregate confidence statistics
+    import statistics
+    confidences = [c.get("confidence", 0.5) for c in verified] if verified else [0.5]
+    confidence_stats = {
+        "mean": round(statistics.mean(confidences), 3),
+        "median": round(statistics.median(confidences), 3),
+        "stdev": round(statistics.stdev(confidences), 3) if len(confidences) > 1 else 0.0,
+        "min": round(min(confidences), 3),
+        "max": round(max(confidences), 3),
+        "count": len(confidences),
+        "distribution": {
+            "high": sum(1 for c in confidences if c >= 0.75),
+            "medium": sum(1 for c in confidences if 0.45 <= c < 0.75),
+            "low": sum(1 for c in confidences if c < 0.45),
+        },
+    }
+
+    # Hallucination rate stats
+    total_claims = len(verified) if verified else 0
+    hallucination_flags_list = [f for f in flags if f.get("is_hallucination")] if flags else []
+    direct_contradictions = [f for f in flags if f.get("flag_type") == "direct_contradiction"] if flags else []
+    unsubstantiated = [f for f in flags if f.get("flag_type") == "unsubstantiated"] if flags else []
+    hallucination_rate = round(len(hallucination_flags_list) / total_claims, 3) if total_claims > 0 else 0.0
+    claim_status_breakdown = {
+        "verified": sum(1 for c in verified if c.get("verification_status") == "verified"),
+        "partially_verified": sum(1 for c in verified if c.get("verification_status") == "partially_verified"),
+        "unverified": sum(1 for c in verified if c.get("verification_status") == "unverified"),
+        "contradicted": sum(1 for c in verified if c.get("verification_status") == "contradicted"),
+    }
+
     total_duration = round(time.time() - pipeline_start, 2)
 
     report = {
@@ -731,6 +846,15 @@ async def run_pipeline(topic: str, api_key: str, api_key_2: str | None = None, a
         "hallucinations": flags,
         "pipeline_log": pipeline_log,
         "total_duration": total_duration,
+        "confidence_stats": confidence_stats,
+        "hallucination_stats": {
+            "total_claims": total_claims,
+            "hallucination_rate": hallucination_rate,
+            "hallucinations_detected": len(hallucination_flags_list),
+            "direct_contradictions": len(direct_contradictions),
+            "unsubstantiated_claims": len(unsubstantiated),
+        },
+        "claim_status_breakdown": claim_status_breakdown,
     }
 
     yield {"event": "complete", "data": json.dumps({"status": "success", "report": report})}

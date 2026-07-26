@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { confidenceClasses } from '../../utils/colors'
 import AnimatedNumber from '../ui/AnimatedNumber'
 import ClaimCard from './ClaimCard'
+import VerificationStatsChart from './VerificationStatsChart'
 import { TrendingUp, CheckCircle2, AlertTriangle, XCircle, ShieldCheck } from 'lucide-react'
 import type { VerificationReport } from '../../types'
 
@@ -177,6 +178,9 @@ function ConfidenceReport({ report }: ConfidenceReportProps) {
           </div>
         </motion.div>
       )}
+
+      {/* Verification Statistics Chart */}
+      <VerificationStatsChart report={report} />
 
       {/* Claims list */}
       {claims.length > 0 && (

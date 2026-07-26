@@ -55,6 +55,35 @@ export interface PipelineLogEntry {
   duration: number
 }
 
+export interface ConfidenceStats {
+  mean: number
+  median: number
+  stdev: number
+  min: number
+  max: number
+  count: number
+  distribution: {
+    high: number
+    medium: number
+    low: number
+  }
+}
+
+export interface HallucinationStats {
+  total_claims: number
+  hallucination_rate: number
+  hallucinations_detected: number
+  direct_contradictions: number
+  unsubstantiated_claims: number
+}
+
+export interface ClaimStatusBreakdown {
+  verified: number
+  partially_verified: number
+  unverified: number
+  contradicted: number
+}
+
 export interface VerificationReport {
   topic: string
   overall_confidence: number
@@ -64,6 +93,9 @@ export interface VerificationReport {
   hallucinations: HallucinationFlag[]
   pipeline_log: PipelineLogEntry[]
   total_duration?: number
+  confidence_stats?: ConfidenceStats
+  hallucination_stats?: HallucinationStats
+  claim_status_breakdown?: ClaimStatusBreakdown
 }
 
 export interface PipelineState {

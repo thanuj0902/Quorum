@@ -6,6 +6,7 @@ import ThemeToggle from '../ui/ThemeToggle'
 import AnimatedNumber from '../ui/AnimatedNumber'
 import { statusIcon, statusLabel } from '../../utils/status'
 import SourceTrustLedger from '../Report/SourceTrustLedger'
+import VerificationStatsChart from '../Report/VerificationStatsChart'
 import { confidenceClasses } from '../../utils/colors'
 import type { VerificationReport } from '../../types'
 
@@ -295,6 +296,17 @@ function ReportView({ report, onBack, onCopyLink, linkCopied }: ReportViewProps)
             transition={{ delay: 0.4 }}
           >
             <SourceTrustLedger report={report} />
+          </motion.div>
+        )}
+
+        {/* Verification Statistics */}
+        {claims.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.45 }}
+          >
+            <VerificationStatsChart report={report} />
           </motion.div>
         )}
       </main>
