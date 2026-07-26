@@ -397,6 +397,28 @@ def calculate_claim_confidence_breakdown(
 
 # --- Agents ---
 
+def _match_claim_to_source(claim: dict, search_results: list[dict]) -> str | None:
+    """Match a claim to the best search result URL via keyword overlap."""
+    claim_text = (claim.get("claim", "") + " " + claim.get("source", "")).lower()
+    if not claim_text.strip():
+        return search_results[0]["url"] if search_results else None
+
+    best_url = None
+    best_score = 0
+    for r in search_results:
+        title_words = set(r.get("title", "").lower().split())
+        content_words = set(r.get("content", "").lower().split())
+        all_words = title_words | content_words
+        claim_words = set(claim_text.split())
+        overlap = len(claim_words & all_words)
+        # Title matches count more
+        title_overlap = len(claim_words & title_words)
+        score = overlap + title_overlap * 2
+        if score > best_score:
+            best_score = score
+            best_url = r.get("url")
+    return best_url
+
 async def research_agent(topic: str, api_key: str, search_results: list[dict] | None = None, provider: str = "groq") -> tuple[list[dict], dict]:
     safe_topic = sanitize_input(topic)
 
@@ -432,6 +454,14 @@ Return a JSON array. No markdown, no explanation.'''
     result = await call_llm(system, prompt, api_key)
     claims = parse_agent_json(result, "Research Agent")
     duration = time.time() - start
+
+    # Post-process: attach real URLs from search results to claims missing source_url
+    if search_results:
+        for claim in claims:
+            if not claim.get("source_url"):
+                best_url = _match_claim_to_source(claim, search_results)
+                if best_url:
+                    claim["source_url"] = best_url
 
     logger.info(f"Research Agent: {len(claims)} claims extracted in {duration:.2f}s")
     return claims, {
@@ -485,6 +515,16 @@ claim, source, source_url, confidence (0.0-1.0), verification_status, supporting
     verified = parse_agent_json(result, "Verification Agent")
     duration = time.time() - start
 
+    # Post-process: preserve source_url from original claims and fill missing ones from search results
+    original_urls = {c.get("claim", ""): c.get("source_url") for c in claims}
+    for v in verified:
+        # Preserve URL from original research claim
+        if not v.get("source_url"):
+            v["source_url"] = original_urls.get(v.get("claim", ""))
+        # Fallback: match against search results
+        if not v.get("source_url") and search_results:
+            v["source_url"] = _match_claim_to_source(v, search_results)
+
     verified_count = sum(1 for v in verified if v.get("verification_status") == "verified")
     partial_count = sum(1 for v in verified if v.get("verification_status") == "partially_verified")
     logger.info(f"Verification Agent: {verified_count} verified, {partial_count} partial in {duration:.2f}s")
@@ -505,34 +545,24 @@ async def contradiction_agent(verified_claims: list[dict], topic: str, api_key: 
 
     system = (
         "You are the Contradiction and Hallucination Detector in Quorum's multi-agent pipeline. "
-        "Your job is to detect TWO distinct types of issues:\n"
-        "1. DIRECT CONTRADICTIONS — where two or more sources give conflicting information about the same claim\n"
-        "2. UNSUBSTANTIATED CLAIMS / HALLUCINATIONS — where a claim cannot be substantiated by any independent source\n\n"
-        "You MUST label each issue with the correct type. "
-        "Provide detailed reasoning for each flag. "
+        "Detect TWO types of issues:\n"
+        "1. DIRECT CONTRADICTIONS — sources disagree on the same claim\n"
+        "2. UNSUBSTANTIATED — claim cannot be verified by any independent source (hallucination)\n\n"
         "Return ONLY valid JSON — no markdown, no explanation outside the JSON."
     )
-    prompt = f'''Analyze these verified claims about: "{safe_topic}"
+    prompt = f'''Analyze these claims about: "{safe_topic}"
 
 Claims:
 {claims_text}
 
-For EACH claim, analyze:
-- flag_type: one of "none", "direct_contradiction", "unsubstantiated"
-  - "direct_contradiction": sources disagree with each other on this claim
-  - "unsubstantiated": no independent source can verify this claim (hallucination)
-- reason: detailed explanation (2-3 sentences) of why this flag was or was not raised
-- severity: none, low, medium, high, critical
-- contradicting_sources: list of sources that contradict this claim (if direct_contradiction)
-- evidence_gaps: what additional evidence would strengthen or weaken this claim?
+For EACH claim return:
+- claim: the claim text
+- flag_type: "none", "direct_contradiction", or "unsubstantiated"
+- reason: 1-2 sentence explanation
+- severity: none, low, medium, high
+- contradicting_sources: list (empty if flag_type is "none")
 
-Also provide an OVERALL_ASSESSMENT entry with claim="OVERALL_ASSESSMENT" summarizing:
-- Total claims analyzed
-- Direct contradictions found
-- Unsubstantiated/hallucinated claims found
-- Overall source quality assessment
-
-Return a JSON array with: claim, flag_type, reason, severity, contradicting_sources, evidence_gaps.'''
+Return a JSON array. No markdown.'''
 
     start = time.time()
     try:
