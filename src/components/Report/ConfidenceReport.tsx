@@ -60,6 +60,11 @@ function ConfidenceReport({ report }: ConfidenceReportProps) {
         <span className="text-sm font-medium text-text truncate">{report.topic}</span>
       </motion.div>
 
+      {/* Live search notice */}
+      <div className="text-[11px] text-text/40 text-center -mt-4">
+        Results are generated from live web search — scores may vary between runs as sources and evidence change.
+      </div>
+
       {/* Overall confidence — hero card */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
