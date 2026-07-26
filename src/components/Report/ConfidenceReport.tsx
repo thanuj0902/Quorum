@@ -1,34 +1,10 @@
-import { memo, useState, useEffect } from 'react'
+import { memo } from 'react'
 import { motion } from 'framer-motion'
 import { confidenceClasses } from '../../utils/colors'
+import AnimatedNumber from '../ui/AnimatedNumber'
 import ClaimCard from './ClaimCard'
 import { TrendingUp, CheckCircle2, AlertTriangle, XCircle, ShieldCheck } from 'lucide-react'
 import type { VerificationReport } from '../../types'
-
-interface AnimatedNumberProps {
-  value: number
-  duration?: number
-}
-
-function AnimatedNumber({ value, duration = 1200 }: AnimatedNumberProps) {
-  const [display, setDisplay] = useState<number>(0)
-
-  useEffect(() => {
-    let frameId: number
-    const startTime = Date.now()
-    const tick = () => {
-      const elapsed = Date.now() - startTime
-      const progress = Math.min(elapsed / duration, 1)
-      const eased = 1 - Math.pow(1 - progress, 3)
-      setDisplay(Math.round(eased * value))
-      if (progress < 1) frameId = requestAnimationFrame(tick)
-    }
-    frameId = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(frameId)
-  }, [value, duration])
-
-  return <span>{display}</span>
-}
 
 interface ConfidenceReportProps {
   report: VerificationReport

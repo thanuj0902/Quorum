@@ -1,54 +1,19 @@
-import { memo, useState, useEffect } from 'react'
+import { memo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Copy, Check, ExternalLink, CheckCircle2, AlertTriangle, XCircle, ShieldCheck } from 'lucide-react'
 import Logo from '../ui/Logo'
 import ThemeToggle from '../ui/ThemeToggle'
+import AnimatedNumber from '../ui/AnimatedNumber'
+import { statusIcon, statusLabel } from '../../utils/status'
+import SourceTrustLedger from '../Report/SourceTrustLedger'
 import { confidenceClasses } from '../../utils/colors'
-import type { VerificationReport, Claim } from '../../types'
+import type { VerificationReport } from '../../types'
 
 interface ReportViewProps {
   report: VerificationReport
   onBack: () => void
   onCopyLink: () => void
   linkCopied: boolean
-}
-
-function AnimatedNumber({ value, duration = 1200 }: { value: number; duration?: number }) {
-  const [display, setDisplay] = useState<number>(0)
-
-  useEffect(() => {
-    let frameId: number
-    const startTime = Date.now()
-    const tick = () => {
-      const elapsed = Date.now() - startTime
-      const progress = Math.min(elapsed / duration, 1)
-      const eased = 1 - Math.pow(1 - progress, 3)
-      setDisplay(Math.round(eased * value))
-      if (progress < 1) frameId = requestAnimationFrame(tick)
-    }
-    frameId = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(frameId)
-  }, [value, duration])
-
-  return <span>{display}</span>
-}
-
-function statusIcon(status: Claim['verification_status']) {
-  switch (status) {
-    case 'verified': return <CheckCircle2 className="w-4 h-4 text-green shrink-0" />
-    case 'partially_verified': return <AlertTriangle className="w-4 h-4 text-yellow shrink-0" />
-    case 'unverified': return <XCircle className="w-4 h-4 text-text-secondary shrink-0" />
-    case 'contradicted': return <XCircle className="w-4 h-4 text-red shrink-0" />
-  }
-}
-
-function statusLabel(status: Claim['verification_status']) {
-  switch (status) {
-    case 'verified': return { text: 'Verified', color: '#34D399', bg: 'rgba(52,211,153,0.08)', border: 'rgba(52,211,153,0.2)' }
-    case 'partially_verified': return { text: 'Partial', color: '#FBBF24', bg: 'rgba(251,191,36,0.08)', border: 'rgba(251,191,36,0.2)' }
-    case 'unverified': return { text: 'Unverified', color: '#7A7A95', bg: 'rgba(122,122,149,0.08)', border: 'rgba(122,122,149,0.2)' }
-    case 'contradicted': return { text: 'Contradicted', color: '#F87171', bg: 'rgba(248,113,113,0.08)', border: 'rgba(248,113,113,0.2)' }
-  }
 }
 
 function ReportView({ report, onBack, onCopyLink, linkCopied }: ReportViewProps) {
@@ -328,46 +293,8 @@ function ReportView({ report, onBack, onCopyLink, linkCopied }: ReportViewProps)
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
-            className="border rounded-2xl p-6"
-            style={{ background: '#111114', borderColor: '#222230' }}
           >
-            <h3 className="font-display text-sm font-semibold mb-4">Source Trust Summary</h3>
-            <div className="space-y-2">
-              {(() => {
-                const sourceMap: Record<string, { cited: number; supported: number; contradicted: number }> = {}
-                claims.forEach(c => {
-                  if (!sourceMap[c.source]) sourceMap[c.source] = { cited: 0, supported: 0, contradicted: 0 }
-                  sourceMap[c.source].cited++
-                  c.supporting_sources?.forEach(s => {
-                    if (!sourceMap[s]) sourceMap[s] = { cited: 0, supported: 0, contradicted: 0 }
-                    sourceMap[s].supported++
-                  })
-                  c.contradicting_sources?.forEach(s => {
-                    if (!sourceMap[s]) sourceMap[s] = { cited: 0, supported: 0, contradicted: 0 }
-                    sourceMap[s].contradicted++
-                  })
-                })
-                return Object.entries(sourceMap)
-                  .sort(([, a], [, b]) => (b.supported - b.contradicted) - (a.supported - a.contradicted))
-                  .slice(0, 8)
-                  .map(([name, data]) => {
-                    const total = data.supported + data.contradicted || 1
-                    const trust = Math.round((data.supported / total) * 100)
-                    const trustColor = trust >= 70 ? '#34D399' : trust >= 40 ? '#FBBF24' : '#F87171'
-                    return (
-                      <div key={name} className="flex items-center gap-4 p-3 rounded-xl border" style={{ background: '#18181D', borderColor: '#222230' }}>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{name}</p>
-                        </div>
-                        <div className="w-24 h-1.5 rounded-full overflow-hidden shrink-0" style={{ background: '#1F1F26' }}>
-                          <div className="h-full rounded-full" style={{ width: `${trust}%`, background: trustColor }} />
-                        </div>
-                        <span className="text-xs font-mono font-bold shrink-0" style={{ color: trustColor }}>{trust}%</span>
-                      </div>
-                    )
-                  })
-              })()}
-            </div>
+            <SourceTrustLedger report={report} />
           </motion.div>
         )}
       </main>
