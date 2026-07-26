@@ -639,10 +639,10 @@ async def run_pipeline(topic: str, api_key: str, api_key_2: str | None = None):
     pipeline_log.append(log2)
     yield {"event": "agent_complete", "data": json.dumps(log2)}
 
-    # Step 3: Contradiction Detector — uses key_b (retry once on bad JSON)
-    logger.info("[Pipeline] Step 3: Contradiction Detector (key B)")
+    # Step 3: Contradiction Detector — uses key_a (key B just did verifier, avoid rate limit)
+    logger.info("[Pipeline] Step 3: Contradiction Detector (key A)")
     for contra_attempt in range(2):
-        flags, log3 = await contradiction_agent(verified, topic, key_b)
+        flags, log3 = await contradiction_agent(verified, topic, key_a)
         if flags:  # Got a non-empty result (even empty list is valid)
             break
         if contra_attempt == 0:

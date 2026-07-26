@@ -104,16 +104,17 @@ export default function Hero({ onStart }: HeroProps) {
         className="relative z-10 text-center max-w-4xl"
       >
         {/* Logo icon */}
-        <motion.div variants={fadeUp} className="mb-6">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-accent/20 via-accent/10 to-green/10 border border-accent/20 backdrop-blur-sm shadow-xl shadow-accent/10">
-            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
-              <circle cx="12" cy="14" r="4" stroke="#7C3AED" strokeWidth="2" fill="none" />
-              <circle cx="28" cy="14" r="4" stroke="#34D399" strokeWidth="2" fill="none" />
-              <circle cx="20" cy="28" r="4" stroke="#FBBF24" strokeWidth="2" fill="none" />
-              <line x1="15" y1="16" x2="25" y2="16" stroke="#7C3AED" strokeWidth="1.5" opacity="0.5" />
-              <line x1="14" y1="18" x2="18" y2="25" stroke="#FBBF24" strokeWidth="1.5" opacity="0.5" />
-              <line x1="26" y1="18" x2="22" y2="25" stroke="#34D399" strokeWidth="1.5" opacity="0.5" />
-              <circle cx="20" cy="16" r="2" fill="#7C3AED" opacity="0.6" />
+        <motion.div variants={fadeUp} className="mb-8">
+          <div className="inline-flex items-center justify-center w-24 h-24 md:w-28 md:h-28 rounded-3xl bg-gradient-to-br from-accent/30 via-accent/15 to-green/15 border-2 border-accent/25 shadow-2xl shadow-accent/20">
+            <svg width="56" height="56" viewBox="0 0 56 56" fill="none" aria-hidden="true">
+              <circle cx="16" cy="18" r="6" stroke="#A78BFA" strokeWidth="2.5" fill="rgba(167,139,250,0.15)" />
+              <circle cx="40" cy="18" r="6" stroke="#34D399" strokeWidth="2.5" fill="rgba(52,211,153,0.15)" />
+              <circle cx="28" cy="40" r="6" stroke="#FBBF24" strokeWidth="2.5" fill="rgba(251,191,36,0.15)" />
+              <circle cx="28" cy="22" r="3.5" fill="#A78BFA" opacity="0.8" />
+              <line x1="20" y1="20" x2="24.5" y2="21" stroke="#A78BFA" strokeWidth="1.5" opacity="0.6" />
+              <line x1="36" y1="20" x2="31.5" y2="21" stroke="#34D399" strokeWidth="1.5" opacity="0.6" />
+              <line x1="19" y1="23" x2="25" y2="36" stroke="#FBBF24" strokeWidth="1.5" opacity="0.5" />
+              <line x1="37" y1="23" x2="31" y2="36" stroke="#34D399" strokeWidth="1.5" opacity="0.5" />
             </svg>
           </div>
         </motion.div>
@@ -121,13 +122,13 @@ export default function Hero({ onStart }: HeroProps) {
         {/* Badge */}
         <motion.div
           variants={fadeUp}
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-border bg-surface/60 backdrop-blur-md mb-8"
+          className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full border border-accent/20 bg-surface/50 backdrop-blur-md mb-8 shadow-lg shadow-accent/5"
         >
-          <span className="relative flex h-1.5 w-1.5">
+          <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green opacity-75" />
-            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-green" />
           </span>
-          <span className="text-[10px] text-text-secondary font-medium tracking-widest uppercase">
+          <span className="text-[11px] text-text-secondary font-medium tracking-widest uppercase">
             4-Agent AI Pipeline
           </span>
         </motion.div>
