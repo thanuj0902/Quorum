@@ -1,6 +1,11 @@
-# Quorum — Multi-Agent Research & Fact-Verification System
+# Quorum — Autonomous Multi-Agent Research & Fact-Verification System
 
-Four AI agents research, cross-verify, detect hallucinations, and compile citation-backed reports — with real-time pipeline visualization, history, shareable links, batch mode, and PDF export.
+Four independent AI agents research, cross-verify, detect hallucinations, and compile citation-backed reports — each as a separate LLM call. Built for InnovaHack Gen AI PS1.
+
+## Live Demo
+
+- **Frontend**: https://quorum-liart.vercel.app
+- **Backend**: https://quorum-production-4df3.up.railway.app
 
 ## Architecture
 
@@ -9,21 +14,28 @@ Topic Input
     │
     ▼
 ┌─────────────────┐
-│  Researcher     │ ── Multi-source claim extraction
+│  Research Agent │ ── Extracts claims from live web sources     [Key A]
 └────────┬────────┘
          ▼
 ┌─────────────────────┐
-│ Cross-Verifier      │ ── Independent cross-referencing
+│ Verification Agent  │ ── Cross-checks each claim independently [Key B]
 └────────┬────────────┘
          ▼
 ┌──────────────────────────┐
-│ Contradiction Detector   │ ── Hallucination & conflict detection
+│ Contradiction Detector   │ ── Flags hallucinations & conflicts [Key C]
 └────────┬─────────────────┘
          ▼
 ┌──────────────────┐
-│ Synthesizer      │ ── Citation-backed report with confidence scores
+│ Synthesis Agent  │ ── Compiles citation-backed report          [Key A]
 └──────────────────┘
+         │
+         ▼
+  Per-claim confidence scores with weighted formula breakdown
+  Clickable source URLs from real DuckDuckGo search results
+  Source Trust Ledger with cross-source agreement rates
 ```
+
+Each agent is a **separate `call_llm()` invocation** — not a single prompt split into sections. Agents consume each other's actual output sequentially.
 
 ## Tech Stack
 
@@ -31,10 +43,23 @@ Topic Input
 |-------|-----------|
 | **Frontend** | React 19, TypeScript, Vite 8, Tailwind CSS v4 |
 | **Animations** | Framer Motion |
-| **Icons** | Lucide React |
-| **Backend** | Python 3, FastAPI, Groq (Llama 3.1 70B) |
-| **Web Search** | DuckDuckGo (free, no key) + Brave Search (optional) |
-| **Deploy** | Vercel (frontend) + Render (backend) |
+| **Charts** | Recharts (Source Trust Ledger) |
+| **PDF Export** | jsPDF |
+| **Backend** | Python 3.11, FastAPI, Groq Llama 3.1 8B Instant |
+| **Web Search** | DuckDuckGo (free, no API key) |
+| **Voice Input** | Web Speech API (SpeechRecognition) |
+| **Deployment** | Vercel (frontend) + Railway (backend) |
+
+## API Keys
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GROQ_API_KEY` | Yes | Key A — Research + Synthesis agents |
+| `GROQ_API_KEY_2` | Yes | Key B — Verification agent |
+| `GROQ_API_KEY_3` | Yes | Key C — Contradiction agent |
+| `BRAVE_API_KEY` | No | Optional fallback search provider |
+
+All Groq keys are free at https://console.groq.com. Three keys ensure zero rate-limit contention — each agent has a dedicated key.
 
 ## Features
 
@@ -42,59 +67,28 @@ Topic Input
 | Feature | Description |
 |---------|-------------|
 | **4-Agent Pipeline** | Research → Verify → Detect → Synthesize, each as a separate LLM call |
-| **Real-time Visualization** | Animated agent handoff with glowing connections and live terminal log |
-| **Claim-Level Report** | Expandable cards with confidence scores, reasoning, supporting/contradicting sources |
-| **Source Trust Ledger** | Ranked source reliability with trust bars |
-| **Pipeline Performance** | Per-agent timing breakdown |
+| **Real-time SSE Streaming** | Frontend connects directly to Railway for live agent activation |
+| **Per-Claim Confidence** | Individual 0-100% score with weighted formula breakdown (source agreement 40%, reliability 25%, contradiction 25%, base 10%) |
+| **Citation-Backed** | Every claim linked to real DuckDuckGo URLs — clickable hyperlinks |
+| **Two Contradiction Types** | `direct_contradiction` (sources disagree) vs `unsubstantiated` (hallucination) — labeled distinctly |
+| **Source Trust Ledger** | Ranked source reliability with trust bars and cross-source agreement rates |
 
-### History & Sharing (P1)
+### History & Sharing
 | Feature | Description |
 |---------|-------------|
-| **Report History** | localStorage-persisted history with session stats (total reports, claims, avg confidence, flagged) |
-| **Delete Entries** | Remove individual history items |
-| **Shareable Links** | Hash-based routing (`/#reportId`) — read-only standalone report view |
-| **Copy Share Link** | One-click clipboard copy with toast confirmation |
+| **Report History** | localStorage + server-persisted history with session stats |
+| **Shareable Links** | Hash-based URLs for cross-device read-only report access |
+| **PDF Export** | Multi-page A4 report via jsPDF |
+| **Batch Verify** | Compare 2-5 claims side by side |
 
-### Batch & Export (P2)
+### UI/UX
 | Feature | Description |
 |---------|-------------|
-| **Batch Verify** | Add 2-5 claims, run all through pipeline, side-by-side comparison grid |
-| **PDF Export** | Quorum-branded printable report via browser print dialog |
+| **Dark/Light Mode** | Theme toggle with localStorage persistence |
+| **Voice Input** | Web Speech API mic button for speaking claims |
+| **Responsive** | Horizontal pipeline on desktop, vertical step list on mobile (375px) |
+| **Pipeline Visualizer** | Animated agent handoff with glowing connections and live terminal log |
 | **Toast Notifications** | Feedback for copy/save/share actions |
-
-### Polish
-| Feature | Description |
-|---------|-------------|
-| **Demo Mode** | Full animated pipeline without API key — perfect for presentations |
-| **Live Mode** | Real backend verification with Anthropic API |
-| **Fallback** | Auto-falls back to demo if backend is unavailable |
-| **Input Validation** | Friendly error states for edge cases |
-| **Responsive** | Horizontal pipeline on desktop, vertical on mobile |
-
-## Quick Start
-
-### Demo Mode (no API key needed)
-```bash
-git clone https://github.com/thanuj0902/Quorum.git
-cd Quorum
-npm install
-npm run dev
-# Open http://localhost:5173
-# Click "Watch it verify a claim" → auto-runs demo pipeline
-```
-
-### Full Mode (with Groq API — free)
-```bash
-# Backend
-cd backend
-pip install -r requirements.txt
-echo "GROQ_API_KEY=gsk-..." > .env
-python main.py
-
-# Frontend (separate terminal)
-cd ..
-npm run dev
-```
 
 ## Project Structure
 
@@ -102,45 +96,70 @@ npm run dev
 Quorum/
 ├── src/
 │   ├── components/
-│   │   ├── Landing/        # Hero, HowItWorks, WhyDifferent, Metrics
+│   │   ├── Landing/        # LandingView, Hero, HowItWorks, WhyDifferent, Metrics, FAQ
 │   │   ├── Pipeline/       # PipelineView, PipelineVisualizer, BatchView
 │   │   ├── Report/         # ClaimCard, ConfidenceReport, SourceTrustLedger
 │   │   ├── History/        # HistoryView, ReportView
-│   │   └── ui/             # Logo, ShareMenu, Toast, ErrorBoundary
-│   ├── hooks/              # usePipeline, useHistory, useToast
-│   ├── data/               # Agent configs, demo report data
+│   │   └── ui/             # Logo, ThemeToggle, AnimatedNumber, ShareMenu, Toast, ErrorBoundary
+│   ├── hooks/              # usePipeline, useHistory, useVoiceInput, useTheme, useToast
+│   ├── data/               # Agent configs
 │   ├── types/              # TypeScript interfaces
-│   ├── lib/                # Utilities (cn)
-│   ├── utils/              # Colors, PDF export
+│   ├── utils/              # colors, pdf, status
 │   ├── App.tsx
 │   └── main.tsx
 ├── backend/
-│   ├── main.py             # FastAPI with 4 agent endpoints
-│   └── requirements.txt
+│   ├── main.py             # FastAPI — 4 agents, SSE streaming, confidence calculation
+│   ├── requirements.txt
+│   └── .env.example
+├── api/
+│   └── og.tsx              # Open Graph image generation
+├── Dockerfile              # Railway deployment
+├── vercel.json             # Vercel rewrites + CSP headers
 ├── tsconfig.json
-├── vite.config.ts
-└── vercel.json
+└── vite.config.ts
 ```
 
-## Design System
+## Quick Start
 
-| Token | Value |
-|-------|-------|
-| Background | `#0A0A0B` |
-| Surface | `#111114` |
-| Border | `#222230` |
-| Accent | `#7C3AED` (purple) |
-| Green | `#34D399` |
-| Yellow | `#FBBF24` |
-| Red | `#F87171` |
-| Fonts | Space Grotesk (display), Inter (body), JetBrains Mono (mono) |
+```bash
+# Clone and install
+git clone https://github.com/thanuj0902/Quorum.git
+cd Quorum
+npm install
 
-## Environment Variables
+# Run frontend
+npm run dev
+# Open http://localhost:5173
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `GROQ_API_KEY` | Yes | Free API key from console.groq.com (Llama 3.1 70B) |
-| `BRAVE_API_KEY` | No | Optional Brave Search key (better search quality, free tier: 2000/month) |
+# Run backend (separate terminal)
+cd backend
+pip install -r requirements.txt
+echo "GROQ_API_KEY=gsk-your-key" > .env
+python main.py
+# Backend runs on http://localhost:8000
+```
+
+## PS Requirements Coverage
+
+| # | Requirement | Implementation |
+|---|-------------|---------------|
+| 1 | Background alignment | Hero.tsx states hallucination problem |
+| 2 | 4 distinct agents | 4 separate `call_llm()` in main.py |
+| 3 | Agents check each other | Real output piped sequentially |
+| 4 | Citation-backed report | All claims have clickable source URLs |
+| 5 | Per-claim confidence | Individual scores with formula breakdown |
+| 6 | Live search API | DuckDuckGo as primary (not fallback) |
+| 7 | Pipeline Visualizer | Real-time SSE streaming via Railway |
+| 8 | Mobile responsive | Vertical step list at 375px |
+| 9 | Two contradiction types | `direct_contradiction` + `unsubstantiated` |
+| 10 | Source Trust Ledger | Recharts bar chart + agreement rate |
+| 11 | Expandable claim cards | Factor breakdown with weighted formula |
+| 12 | Voice Input | Web Speech API |
+| 13 | History/Saved Reports | localStorage + server, with delete |
+| 14 | Shareable Report Link | Hash-based URL, cross-device |
+| 15 | Framer Motion | Rich in visualizer, subtle elsewhere |
+| 16 | Responsive (375/768/1440) | Tailwind breakpoints |
+| 17 | PDF/Export | jsPDF multi-page |
 
 ## License
 
