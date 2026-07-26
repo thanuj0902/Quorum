@@ -607,91 +607,26 @@ async def run_pipeline(topic: str, api_key: str):
     search_results = await web_search(topic, max_results=5)
     logger.info(f"[Pipeline] Search returned {len(search_results)} results")
 
-    # Single combined LLM call — does research + verification + contradiction + synthesis
-    # This avoids Groq's 6000 tokens/min rate limit on free tier
-    search_context = ""
-    if search_results:
-        search_context = "\n\nREAL WEB SEARCH RESULTS (use these as primary sources):\n"
-        for i, r in enumerate(search_results[:5], 1):
-            search_context += f"\n{i}. {r['title']}\n   URL: {r['url']}\n   Content: {r['content'][:300]}\n"
-
-    system = (
-        "You are ALL FOUR agents in Quorum's multi-agent fact-verification pipeline:\n"
-        "1. RESEARCHER — extract factual claims from the topic\n"
-        "2. VERIFIER — cross-reference each claim against sources\n"
-        "3. CONTRADICTION DETECTOR — detect contradictions and hallucinations\n"
-        "4. SYNTHESIZER — compile the executive summary\n\n"
-        "Use the web search results as primary sources. "
-        "For each claim, track supporting AND contradicting sources. "
-        "Return ONLY valid JSON — no markdown, no explanation outside the JSON."
-    )
-    prompt = f'''Analyze: "{topic}"
-{search_context}
-
-Return a JSON object with these EXACT fields:
-{{
-  "claims": [
-    {{
-      "claim": "factual statement",
-      "source": "source name",
-      "source_url": "URL if available",
-      "confidence": 0.0-1.0,
-      "verification_status": "verified|partially_verified|unverified|contradicted",
-      "supporting_sources": ["source1", "source2"],
-      "contradicting_sources": ["source1"],
-      "reasoning": "1-2 sentence explanation",
-      "category": "statistic|historical|scientific|financial|technical|general"
-    }}
-  ],
-  "hallucinations": [
-    {{
-      "claim": "problematic claim",
-      "flag_type": "direct_contradiction|unsubstantiated",
-      "reason": "why flagged",
-      "severity": "none|low|medium|high|critical",
-      "contradicting_sources": [],
-      "evidence_gaps": "what evidence is missing"
-    }}
-  ],
-  "summary": "3-5 sentence executive summary",
-  "confidence_reasoning": "1-2 sentence explanation of confidence"
-}}
-
-Extract 4-6 claims. For each hallucination entry, only include claims that have actual issues (flag_type not "none").'''
-
-    # Agent 1: Research (emit event)
-    log1 = {"agent": "researcher", "status": "running", "message": "Extracting claims from web sources", "duration": 0}
+    # Step 1: Research
+    logger.info("[Pipeline] Starting research agent")
+    claims, log1 = await research_agent(topic, api_key, search_results)
     pipeline_log.append(log1)
     yield {"event": "agent_complete", "data": json.dumps(log1)}
 
-    # Single LLM call
-    logger.info("[Pipeline] Starting combined LLM call")
-    try:
-        result = await call_llm(system, prompt, api_key)
-        data = parse_agent_json(result, "Combined Agent")
-    except Exception as e:
-        logger.error(f"[Pipeline] Combined agent failed: {e}")
-        raise
+    # Rate limit: wait for token regeneration (~100 tokens/sec on Groq free tier)
+    await asyncio.sleep(12)
 
-    # Emit remaining agent events with realistic timing
-    t1 = round(random.uniform(0.8, 2.0), 2)
-    t2 = round(random.uniform(1.0, 3.0), 2)
-    t3 = round(random.uniform(0.5, 1.5), 2)
-    t4 = round(random.uniform(0.3, 1.0), 2)
-
-    claims = data.get("claims", [])
-    flags = data.get("hallucinations", [])
-    verified = data.get("claims", [])
-
-    log1_done = {"agent": "researcher", "status": "done", "message": f"Extracted {len(claims)} claims from {len(search_results)} web sources", "duration": t1}
-    pipeline_log[-1] = log1_done
-    yield {"event": "agent_complete", "data": json.dumps(log1_done)}
-
-    log2 = {"agent": "verifier", "status": "done", "message": f"Verified {len(claims)} claims against {len(search_results)} sources", "duration": t2}
+    # Step 2: Verify
+    logger.info("[Pipeline] Starting verifier agent")
+    verified, log2 = await verifier_agent(claims, topic, api_key, search_results)
     pipeline_log.append(log2)
     yield {"event": "agent_complete", "data": json.dumps(log2)}
 
-    log3 = {"agent": "contradiction", "status": "done", "message": f"{len(flags)} issues flagged ({sum(1 for f in flags if f.get('flag_type')=='direct_contradiction')} contradictions, {sum(1 for f in flags if f.get('flag_type')=='unsubstantiated')} unsubstantiated)", "duration": t3}
+    await asyncio.sleep(12)
+
+    # Step 3: Contradiction detection
+    logger.info("[Pipeline] Starting contradiction agent")
+    flags, log3 = await contradiction_agent(verified, topic, api_key)
     pipeline_log.append(log3)
     yield {"event": "agent_complete", "data": json.dumps(log3)}
 
@@ -708,7 +643,11 @@ Extract 4-6 claims. For each hallucination entry, only include claims that have 
             "source_reliability": round(sum(get_source_tier(s) for s in supp) / max(1, len(supp)), 2),
         }
 
-    log4 = {"agent": "synthesizer", "status": "done", "message": "Report compiled with citation-backed confidence scores", "duration": t4}
+    await asyncio.sleep(12)
+
+    # Step 5: Synthesize
+    logger.info("[Pipeline] Starting synthesizer agent")
+    report_data, log4 = await synthesizer_agent(topic, verified, flags, api_key)
     pipeline_log.append(log4)
     yield {"event": "agent_complete", "data": json.dumps(log4)}
 
@@ -723,8 +662,8 @@ Extract 4-6 claims. For each hallucination entry, only include claims that have 
     report = {
         "topic": topic,
         "overall_confidence": overall_confidence,
-        "summary": data.get("summary", ""),
-        "confidence_reasoning": data.get("confidence_reasoning", ""),
+        "summary": report_data.get("summary", ""),
+        "confidence_reasoning": report_data.get("confidence_reasoning", ""),
         "claims": verified,
         "hallucinations": flags,
         "pipeline_log": pipeline_log,
