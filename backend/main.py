@@ -533,8 +533,12 @@ Also provide an OVERALL_ASSESSMENT entry with claim="OVERALL_ASSESSMENT" summari
 Return a JSON array with: claim, flag_type, reason, severity, contradicting_sources, evidence_gaps.'''
 
     start = time.time()
-    result = await call_llm(system, prompt, api_key)
-    flags = parse_agent_json(result, "Contradiction Detector")
+    try:
+        result = await call_llm(system, prompt, api_key)
+        flags = parse_agent_json(result, "Contradiction Detector")
+    except Exception as e:
+        logger.error(f"Contradiction Detector LLM failed: {e} — returning empty flags")
+        flags = []
     duration = time.time() - start
 
     contradictions = sum(1 for f in flags if f.get("flag_type") == "direct_contradiction")
@@ -590,8 +594,12 @@ Return JSON with exactly these fields:
 }}'''
 
     start = time.time()
-    result = await call_llm(system, prompt, api_key)
-    report_data = parse_agent_json(result, "Synthesizer")
+    try:
+        result = await call_llm(system, prompt, api_key)
+        report_data = parse_agent_json(result, "Synthesizer")
+    except Exception as e:
+        logger.error(f"Synthesizer LLM failed: {e} — using fallback summary")
+        report_data = {"summary": "Report compiled with available data. Some synthesis details may be limited.", "confidence_reasoning": "Confidence scores are based on algorithmic source analysis."}
     duration = time.time() - start
 
     logger.info(f"Synthesizer: report compiled in {duration:.2f}s")
