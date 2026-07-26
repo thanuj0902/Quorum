@@ -118,73 +118,80 @@ def clean_json(text: str) -> str:
     return text.strip()
 
 
-async def call_llm(system_prompt: str, user_prompt: str, api_key: str) -> str:
+async def call_llm(system_prompt: str, user_prompt: str, api_key: str, preferred_provider: str = "auto") -> str:
     errors = []
 
-    # Provider 1: Groq (fastest) — retry up to 3 times with backoff on 429
-    groq_key = os.getenv("GROQ_API_KEY")
-    if groq_key:
-        for attempt in range(3):
-            try:
-                async with httpx.AsyncClient(timeout=120.0) as client:
-                    response = await client.post(
-                        "https://api.groq.com/openai/v1/chat/completions",
-                        headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
-                        json={
-                            "model": "llama-3.1-8b-instant",
-                            "max_tokens": 4096,
-                            "temperature": 0.2,
-                            "messages": [
-                                {"role": "system", "content": system_prompt},
-                                {"role": "user", "content": user_prompt},
-                            ],
-                        },
-                    )
-                    if response.status_code == 200:
-                        data = response.json()
-                        if "choices" in data and data["choices"]:
-                            return data["choices"][0]["message"]["content"]
-                    elif response.status_code == 429:
-                        retry_after = int(response.headers.get("retry-after", 5 + attempt * 10))
-                        logger.warning(f"Groq rate limited (attempt {attempt+1}/3), waiting {retry_after}s")
-                        await asyncio.sleep(retry_after)
-                        continue
-                    else:
-                        errors.append(f"Groq: HTTP {response.status_code}")
-                        logger.warning(f"Groq returned {response.status_code}")
-            except Exception as e:
-                errors.append(f"Groq: {e}")
-                logger.warning(f"Groq failed: {e}")
-        errors.append("Groq: exhausted retries")
+    # Build provider order based on preference
+    if preferred_provider == "gemini":
+        providers = ["gemini", "groq"]
+    elif preferred_provider == "groq":
+        providers = ["groq", "gemini"]
+    else:
+        providers = ["groq", "gemini"]
 
-    # Provider 2: Gemini (fallback)
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    if gemini_key:
-        for attempt in range(3):
-            try:
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    response = await client.post(
-                        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={gemini_key}",
-                        headers={"Content-Type": "application/json"},
-                        json={
-                            "contents": [{"parts": [{"text": f"{system_prompt}\n\n{user_prompt}"}]}],
-                            "generationConfig": {"maxOutputTokens": 4096, "temperature": 0.2},
-                        },
-                    )
-                    if response.status_code == 200:
-                        data = response.json()
-                        text = data["candidates"][0]["content"]["parts"][0]["text"]
-                        return text
-                    elif response.status_code == 429:
-                        wait = 5 + attempt * 15
-                        logger.warning(f"Gemini rate limited (attempt {attempt+1}/3), waiting {wait}s")
-                        await asyncio.sleep(wait)
-                    else:
-                        errors.append(f"Gemini: HTTP {response.status_code}")
-            except Exception as e:
-                errors.append(f"Gemini attempt {attempt + 1}: {e}")
-                logger.warning(f"Gemini failed: {e}")
-                await asyncio.sleep(1)
+    for provider in providers:
+        if provider == "groq":
+            groq_key = os.getenv("GROQ_API_KEY")
+            if not groq_key:
+                continue
+            for attempt in range(2):
+                try:
+                    async with httpx.AsyncClient(timeout=120.0) as client:
+                        response = await client.post(
+                            "https://api.groq.com/openai/v1/chat/completions",
+                            headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+                            json={
+                                "model": "llama-3.1-8b-instant",
+                                "max_tokens": 4096,
+                                "temperature": 0.2,
+                                "messages": [
+                                    {"role": "system", "content": system_prompt},
+                                    {"role": "user", "content": user_prompt},
+                                ],
+                            },
+                        )
+                        if response.status_code == 200:
+                            data = response.json()
+                            if "choices" in data and data["choices"]:
+                                return data["choices"][0]["message"]["content"]
+                        elif response.status_code == 429:
+                            retry_after = int(response.headers.get("retry-after", 5 + attempt * 10))
+                            logger.warning(f"Groq rate limited (attempt {attempt+1}/2), waiting {retry_after}s")
+                            await asyncio.sleep(retry_after)
+                        else:
+                            errors.append(f"Groq: HTTP {response.status_code}")
+                except Exception as e:
+                    errors.append(f"Groq: {e}")
+                    logger.warning(f"Groq failed: {e}")
+
+        elif provider == "gemini":
+            gemini_key = os.getenv("GEMINI_API_KEY")
+            if not gemini_key:
+                continue
+            for attempt in range(2):
+                try:
+                    async with httpx.AsyncClient(timeout=60.0) as client:
+                        response = await client.post(
+                            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={gemini_key}",
+                            headers={"Content-Type": "application/json"},
+                            json={
+                                "contents": [{"parts": [{"text": f"{system_prompt}\n\n{user_prompt}"}]}],
+                                "generationConfig": {"maxOutputTokens": 4096, "temperature": 0.2},
+                            },
+                        )
+                        if response.status_code == 200:
+                            data = response.json()
+                            text = data["candidates"][0]["content"]["parts"][0]["text"]
+                            return text
+                        elif response.status_code == 429:
+                            wait = 10 + attempt * 20
+                            logger.warning(f"Gemini rate limited (attempt {attempt+1}/2), waiting {wait}s")
+                            await asyncio.sleep(wait)
+                        else:
+                            errors.append(f"Gemini: HTTP {response.status_code}")
+                except Exception as e:
+                    errors.append(f"Gemini: {e}")
+                    logger.warning(f"Gemini failed: {e}")
 
     logger.error(f"All providers failed: {errors}")
     raise HTTPException(status_code=502, detail=f"Providers failed: {'; '.join(errors)}")
@@ -389,7 +396,7 @@ def calculate_claim_confidence(
 
 # --- Agents ---
 
-async def research_agent(topic: str, api_key: str, search_results: list[dict] | None = None) -> tuple[list[dict], dict]:
+async def research_agent(topic: str, api_key: str, search_results: list[dict] | None = None, provider: str = "groq") -> tuple[list[dict], dict]:
     safe_topic = sanitize_input(topic)
 
     # Build context from real search results if available
@@ -421,7 +428,7 @@ Extract 4-6 key factual claims. For each, provide:
 Return a JSON array. No markdown, no explanation.'''
 
     start = time.time()
-    result = await call_llm(system, prompt, api_key)
+    result = await call_llm(system, prompt, api_key, preferred_provider=provider)
     claims = parse_agent_json(result, "Research Agent")
     duration = time.time() - start
 
@@ -434,7 +441,7 @@ Return a JSON array. No markdown, no explanation.'''
     }
 
 
-async def verifier_agent(claims: list[dict], topic: str, api_key: str, search_results: list[dict] | None = None) -> tuple[list[dict], dict]:
+async def verifier_agent(claims: list[dict], topic: str, api_key: str, search_results: list[dict] | None = None, provider: str = "gemini") -> tuple[list[dict], dict]:
     safe_topic = sanitize_input(topic)
     claims_text = "\n".join([
         f"- {c.get('claim', '')} (Source: {c.get('source', 'unknown')}, Category: {c.get('category', 'general')}, Confidence: {c.get('confidence', 0)})"
@@ -473,7 +480,7 @@ Return a JSON array with exactly these fields per claim:
 claim, source, source_url, confidence (0.0-1.0), verification_status, supporting_sources (array of source names), contradicting_sources (array of source names), reasoning (1-2 sentences explaining verification)'''
 
     start = time.time()
-    result = await call_llm(system, prompt, api_key)
+    result = await call_llm(system, prompt, api_key, preferred_provider=provider)
     verified = parse_agent_json(result, "Verification Agent")
     duration = time.time() - start
 
@@ -488,7 +495,7 @@ claim, source, source_url, confidence (0.0-1.0), verification_status, supporting
     }
 
 
-async def contradiction_agent(verified_claims: list[dict], topic: str, api_key: str) -> tuple[list[dict], dict]:
+async def contradiction_agent(verified_claims: list[dict], topic: str, api_key: str, provider: str = "groq") -> tuple[list[dict], dict]:
     safe_topic = sanitize_input(topic)
     claims_text = "\n".join([
         f"- {c.get('claim', '')} [Status: {c.get('verification_status', 'unknown')}, Confidence: {c.get('confidence', 0)}, Supporting: {', '.join(c.get('supporting_sources', [])[:3])}, Contradicting: {', '.join(c.get('contradicting_sources', [])[:3])}]"
@@ -527,7 +534,7 @@ Also provide an OVERALL_ASSESSMENT entry with claim="OVERALL_ASSESSMENT" summari
 Return a JSON array with: claim, flag_type, reason, severity, contradicting_sources, evidence_gaps.'''
 
     start = time.time()
-    result = await call_llm(system, prompt, api_key)
+    result = await call_llm(system, prompt, api_key, preferred_provider=provider)
     flags = parse_agent_json(result, "Contradiction Detector")
     duration = time.time() - start
 
@@ -548,6 +555,7 @@ async def synthesizer_agent(
     verified_claims: list[dict],
     hallucinations: list[dict],
     api_key: str,
+    provider: str = "gemini",
 ) -> tuple[dict, dict]:
     safe_topic = sanitize_input(topic)
     claims_text = "\n".join([
@@ -583,7 +591,7 @@ Return JSON with exactly these fields:
 }}'''
 
     start = time.time()
-    result = await call_llm(system, prompt, api_key)
+    result = await call_llm(system, prompt, api_key, preferred_provider=provider)
     report_data = parse_agent_json(result, "Synthesizer")
     duration = time.time() - start
 
@@ -607,26 +615,25 @@ async def run_pipeline(topic: str, api_key: str):
     search_results = await web_search(topic, max_results=5)
     logger.info(f"[Pipeline] Search returned {len(search_results)} results")
 
-    # Step 1: Research
-    logger.info("[Pipeline] Starting research agent")
-    claims, log1 = await research_agent(topic, api_key, search_results)
+    # Step 1: Research (Groq)
+    logger.info("[Pipeline] Starting research agent (Groq)")
+    claims, log1 = await research_agent(topic, api_key, search_results, provider="groq")
     pipeline_log.append(log1)
     yield {"event": "agent_complete", "data": json.dumps(log1)}
 
-    # Rate limit: wait for token regeneration (~100 tokens/sec on Groq free tier)
-    await asyncio.sleep(12)
+    await asyncio.sleep(2)
 
-    # Step 2: Verify
-    logger.info("[Pipeline] Starting verifier agent")
-    verified, log2 = await verifier_agent(claims, topic, api_key, search_results)
+    # Step 2: Verify (Gemini)
+    logger.info("[Pipeline] Starting verifier agent (Gemini)")
+    verified, log2 = await verifier_agent(claims, topic, api_key, search_results, provider="gemini")
     pipeline_log.append(log2)
     yield {"event": "agent_complete", "data": json.dumps(log2)}
 
-    await asyncio.sleep(12)
+    await asyncio.sleep(2)
 
-    # Step 3: Contradiction detection
-    logger.info("[Pipeline] Starting contradiction agent")
-    flags, log3 = await contradiction_agent(verified, topic, api_key)
+    # Step 3: Contradiction detection (Groq)
+    logger.info("[Pipeline] Starting contradiction agent (Groq)")
+    flags, log3 = await contradiction_agent(verified, topic, api_key, provider="groq")
     pipeline_log.append(log3)
     yield {"event": "agent_complete", "data": json.dumps(log3)}
 
@@ -643,11 +650,11 @@ async def run_pipeline(topic: str, api_key: str):
             "source_reliability": round(sum(get_source_tier(s) for s in supp) / max(1, len(supp)), 2),
         }
 
-    await asyncio.sleep(12)
+    await asyncio.sleep(2)
 
-    # Step 5: Synthesize
-    logger.info("[Pipeline] Starting synthesizer agent")
-    report_data, log4 = await synthesizer_agent(topic, verified, flags, api_key)
+    # Step 5: Synthesize (Gemini)
+    logger.info("[Pipeline] Starting synthesizer agent (Gemini)")
+    report_data, log4 = await synthesizer_agent(topic, verified, flags, api_key, provider="gemini")
     pipeline_log.append(log4)
     yield {"event": "agent_complete", "data": json.dumps(log4)}
 
