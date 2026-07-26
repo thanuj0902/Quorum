@@ -2,6 +2,19 @@
 
 Four independent AI agents research, cross-verify, detect hallucinations, and compile citation-backed reports — each as a separate LLM call. Built for InnovaHack Gen AI PS1.
 
+## Important Note: Results Vary Between Runs
+
+**Quorum uses live web search (DuckDuckGo + Wikipedia) — not a fixed database.** When you analyze the same topic twice, the results **will differ** because:
+
+1. **Different sources are fetched each time** — DuckDuckGo and Wikipedia return results based on recency, relevance, and ranking, which change between queries
+2. **Different claims are extracted** — The Research Agent may identify different factual claims depending on which sources it finds
+3. **Different verification outcomes** — The Verification Agent cross-checks against the new sources, producing different confidence scores
+4. **Different hallucination flags** — The Contradiction Detector compares against different evidence each run
+
+This is **by design, not a bug** — it proves the system is reading real, live data rather than returning canned responses. Each run reflects the most current state of available information on the web.
+
+> If you need consistent results, use the same topic within a short time window. Over days/weeks, source availability and rankings shift naturally.
+
 ## Live Demo
 
 - **Frontend**: https://quorum-liart.vercel.app
@@ -43,10 +56,10 @@ Each agent is a **separate `call_llm()` invocation** — not a single prompt spl
 |-------|-----------|
 | **Frontend** | React 19, TypeScript, Vite 8, Tailwind CSS v4 |
 | **Animations** | Framer Motion |
-| **Charts** | Recharts (Source Trust Ledger) |
+| **Charts** | Recharts (Source Trust Ledger, Verification Stats) |
 | **PDF Export** | jsPDF |
 | **Backend** | Python 3.11, FastAPI, Groq Llama 3.1 8B Instant |
-| **Web Search** | DuckDuckGo (free, no API key) |
+| **Web Search** | DuckDuckGo + Wikipedia (both free, no API keys) |
 | **Voice Input** | Web Speech API (SpeechRecognition) |
 | **Deployment** | Vercel (frontend) + Railway (backend) |
 
@@ -69,9 +82,20 @@ All Groq keys are free at https://console.groq.com. Three keys ensure zero rate-
 | **4-Agent Pipeline** | Research → Verify → Detect → Synthesize, each as a separate LLM call |
 | **Real-time SSE Streaming** | Frontend connects directly to Railway for live agent activation |
 | **Per-Claim Confidence** | Individual 0-100% score with weighted formula breakdown (source agreement 40%, reliability 25%, contradiction 25%, base 10%) |
-| **Citation-Backed** | Every claim linked to real DuckDuckGo URLs — clickable hyperlinks |
+| **Citation-Backed** | Every claim linked to real DuckDuckGo + Wikipedia URLs — clickable hyperlinks |
 | **Two Contradiction Types** | `direct_contradiction` (sources disagree) vs `unsubstantiated` (hallucination) — labeled distinctly |
 | **Source Trust Ledger** | Ranked source reliability with trust bars and cross-source agreement rates |
+| **Verification Statistics** | Confidence distribution, hallucination rate pie chart, claim status breakdown |
+| **Wikipedia Integration** | Authoritative encyclopedia sources alongside DuckDuckGo — parallel search + deduplication |
+
+### Landing Page
+| Feature | Description |
+|---------|-------------|
+| **Stats Bar** | Social proof counters — 4 agents, 2 search providers, 100% source-backed, <30s pipeline |
+| **Demo Preview** | Live pipeline mockup showing agent steps, terminal view, and claim report |
+| **Performance Metrics** | Real measured pipeline timing per agent |
+| **How It Works** | 4-step visual walkthrough of the pipeline |
+| **Why Different** | 3 key differentiators vs single-model fact-checking |
 
 ### History & Sharing
 | Feature | Description |
@@ -96,9 +120,9 @@ All Groq keys are free at https://console.groq.com. Three keys ensure zero rate-
 Quorum/
 ├── src/
 │   ├── components/
-│   │   ├── Landing/        # LandingView, Hero, HowItWorks, WhyDifferent, Metrics, FAQ
+│   │   ├── Landing/        # LandingView, Hero, StatsBar, HowItWorks, DemoPreview, WhyDifferent, Metrics, FAQ
 │   │   ├── Pipeline/       # PipelineView, PipelineVisualizer, BatchView
-│   │   ├── Report/         # ClaimCard, ConfidenceReport, SourceTrustLedger
+│   │   ├── Report/         # ClaimCard, ConfidenceReport, SourceTrustLedger, VerificationStatsChart
 │   │   ├── History/        # HistoryView, ReportView
 │   │   └── ui/             # Logo, ThemeToggle, AnimatedNumber, ShareMenu, Toast, ErrorBoundary
 │   ├── hooks/              # usePipeline, useHistory, useVoiceInput, useTheme, useToast
@@ -108,7 +132,7 @@ Quorum/
 │   ├── App.tsx
 │   └── main.tsx
 ├── backend/
-│   ├── main.py             # FastAPI — 4 agents, SSE streaming, confidence calculation
+│   ├── main.py             # FastAPI — 4 agents, Wikipedia + DuckDuckGo, SSE streaming, confidence stats
 │   ├── requirements.txt
 │   └── .env.example
 ├── api/
@@ -148,7 +172,7 @@ python main.py
 | 3 | Agents check each other | Real output piped sequentially |
 | 4 | Citation-backed report | All claims have clickable source URLs |
 | 5 | Per-claim confidence | Individual scores with formula breakdown |
-| 6 | Live search API | DuckDuckGo as primary (not fallback) |
+| 6 | Live search API | DuckDuckGo + Wikipedia as primary (not fallback) |
 | 7 | Pipeline Visualizer | Real-time SSE streaming via Railway |
 | 8 | Mobile responsive | Vertical step list at 375px |
 | 9 | Two contradiction types | `direct_contradiction` + `unsubstantiated` |
