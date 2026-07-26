@@ -29,6 +29,9 @@ RATE_LIMIT_MAX = 5
 rate_limit_store: dict[str, list[float]] = defaultdict(list)
 
 
+GROQ_API_KEY_2 = os.getenv("GROQ_API_KEY_2", "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")
+
+
 class RateLimitMiddleware:
     def __init__(self, app):
         self.app = app
@@ -716,13 +719,12 @@ async def batch_verify(request: BatchRequest):
 @app.on_event("startup")
 async def startup_check():
     api_key = os.getenv("GROQ_API_KEY")
-    api_key_2 = os.getenv("GROQ_API_KEY_2")
     brave_key = os.getenv("BRAVE_API_KEY")
     if not api_key:
         logger.error("GROQ_API_KEY not set — pipeline will fail")
     else:
         logger.info("Groq API key A configured")
-    if api_key_2:
+    if GROQ_API_KEY_2:
         logger.info("Groq API key B configured (dual-key mode)")
     else:
         logger.info("GROQ_API_KEY_2 not set — using single-key mode")
@@ -735,7 +737,6 @@ async def startup_check():
 @app.get("/api/health")
 async def health():
     api_key = os.getenv("GROQ_API_KEY")
-    api_key_2 = os.getenv("GROQ_API_KEY_2")
     brave_key = os.getenv("BRAVE_API_KEY")
     return {
         "status": "ok",
@@ -743,10 +744,10 @@ async def health():
         "version": "4.1.0",
         "providers": {
             "groq": bool(api_key),
-            "groq_key_b": bool(api_key_2),
+            "groq_key_b": bool(GROQ_API_KEY_2),
         },
         "api_key_configured": bool(api_key),
-        "dual_key_mode": bool(api_key_2),
+        "dual_key_mode": bool(GROQ_API_KEY_2),
         "search_provider": "brave" if brave_key else "duckduckgo",
         "pipeline_agents": ["researcher", "verifier", "contradiction", "synthesizer"],
     }
@@ -755,10 +756,9 @@ async def health():
 @app.get("/api/test-llm")
 async def test_llm():
     groq_key = os.getenv("GROQ_API_KEY")
-    groq_key_2 = os.getenv("GROQ_API_KEY_2")
     results = {}
 
-    for label, key in [("groq", groq_key), ("groq_key_b", groq_key_2)]:
+    for label, key in [("groq", groq_key), ("groq_key_b", GROQ_API_KEY_2)]:
         if key:
             try:
                 async with httpx.AsyncClient(timeout=30.0) as client:
