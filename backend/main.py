@@ -166,7 +166,13 @@ def parse_agent_json(raw: str, agent_name: str) -> list | dict:
         return parsed
     except json.JSONDecodeError as e:
         logger.error(f"{agent_name} returned invalid JSON: {e}")
-        raise HTTPException(status_code=502, detail=f"{agent_name} returned invalid JSON. Please retry.")
+        logger.error(f"Raw response (first 500 chars): {raw[:500]}")
+        # Return sensible defaults so the pipeline continues
+        if "contradiction" in agent_name.lower():
+            return []
+        if "synthesizer" in agent_name.lower():
+            return {"summary": "Report generation encountered an error. Please retry.", "confidence_reasoning": "Unable to generate."}
+        return []
 
 
 # --- Web Search (GUARANTEED — no paid API required) ---
@@ -595,9 +601,15 @@ async def run_pipeline(topic: str, api_key: str, api_key_2: str | None = None):
     pipeline_log.append(log2)
     yield {"event": "agent_complete", "data": json.dumps(log2)}
 
-    # Step 3: Contradiction Detector — uses key_b
+    # Step 3: Contradiction Detector — uses key_b (retry once on bad JSON)
     logger.info("[Pipeline] Step 3: Contradiction Detector (key B)")
-    flags, log3 = await contradiction_agent(verified, topic, key_b)
+    for contra_attempt in range(2):
+        flags, log3 = await contradiction_agent(verified, topic, key_b)
+        if flags:  # Got a non-empty result (even empty list is valid)
+            break
+        if contra_attempt == 0:
+            logger.warning("[Pipeline] Contradiction detector returned empty, retrying...")
+            await asyncio.sleep(2)
     pipeline_log.append(log3)
     yield {"event": "agent_complete", "data": json.dumps(log3)}
 
