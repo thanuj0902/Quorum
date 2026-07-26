@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { BarChart3, AlertTriangle, CheckCircle2, XCircle, MinusCircle, TrendingUp } from 'lucide-react'
+import { BarChart3, AlertTriangle, CheckCircle2, MinusCircle, TrendingUp } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts'
 import type { VerificationReport } from '../../types'
 
@@ -12,8 +12,6 @@ function VerificationStatsChart({ report }: VerificationStatsChartProps) {
   const stats = report.confidence_stats
   const hallucinationStats = report.hallucination_stats
   const claimStatus = report.claim_status_breakdown
-
-  if (!stats && !hallucinationStats && !claimStatus) return null
 
   // Claim status bar chart data
   const statusData = useMemo(() => {
@@ -47,6 +45,8 @@ function VerificationStatsChart({ report }: VerificationStatsChartProps) {
   }, [hallucinationStats])
 
   const hRate = hallucinationStats ? Math.round(hallucinationStats.hallucination_rate * 100) : 0
+
+  if (!stats && !hallucinationStats && !claimStatus) return null
 
   return (
     <motion.div

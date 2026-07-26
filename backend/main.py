@@ -5,6 +5,7 @@ import time
 import asyncio
 import random
 import logging
+import statistics
 from collections import defaultdict
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,7 +20,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("quorum")
 
-app = FastAPI(title="Quorum", version="4.3.0", description="Multi-agent AI fact-verification system")
+app = FastAPI(title="Quorum", version="4.4.0", description="Multi-agent AI fact-verification system with Wikipedia verification")
 
 MAX_TOPIC_LENGTH = 500
 MAX_RETRIES = 2
@@ -806,7 +807,6 @@ async def run_pipeline(topic: str, api_key: str, api_key_2: str | None = None, a
         overall_confidence = 0.5
 
     # Aggregate confidence statistics
-    import statistics
     confidences = [c.get("confidence", 0.5) for c in verified] if verified else [0.5]
     confidence_stats = {
         "mean": round(statistics.mean(confidences), 3),
