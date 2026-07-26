@@ -118,90 +118,42 @@ def clean_json(text: str) -> str:
     return text.strip()
 
 
-async def call_llm(system_prompt: str, user_prompt: str, api_key: str, preferred_provider: str = "auto") -> str:
-    errors = []
+async def call_llm(system_prompt: str, user_prompt: str, api_key: str) -> str:
+    groq_key = os.getenv("GROQ_API_KEY")
+    if not groq_key:
+        raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured")
 
-    if preferred_provider == "gemini":
-        providers = ["gemini", "groq"]
-    elif preferred_provider == "groq":
-        providers = ["groq", "gemini"]
-    else:
-        providers = ["groq", "gemini"]
+    for attempt in range(3):
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                response = await client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+                    json={
+                        "model": "llama-3.1-8b-instant",
+                        "max_tokens": 4096,
+                        "temperature": 0.2,
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                    },
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    if "choices" in data and data["choices"]:
+                        return data["choices"][0]["message"]["content"]
+                    logger.warning("Groq returned empty choices")
+                elif response.status_code == 429:
+                    wait = 10 + attempt * 15
+                    logger.warning(f"Groq rate limited (attempt {attempt+1}/3), waiting {wait}s")
+                    await asyncio.sleep(wait)
+                else:
+                    logger.warning(f"Groq HTTP {response.status_code}")
+        except Exception as e:
+            logger.warning(f"Groq failed: {e}")
 
-    for provider in providers:
-        if provider == "groq":
-            groq_key = os.getenv("GROQ_API_KEY")
-            if not groq_key:
-                errors.append("Groq: no API key")
-                continue
-            for attempt in range(2):
-                try:
-                    async with httpx.AsyncClient(timeout=120.0) as client:
-                        response = await client.post(
-                            "https://api.groq.com/openai/v1/chat/completions",
-                            headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
-                            json={
-                                "model": "llama-3.1-8b-instant",
-                                "max_tokens": 4096,
-                                "temperature": 0.2,
-                                "messages": [
-                                    {"role": "system", "content": system_prompt},
-                                    {"role": "user", "content": user_prompt},
-                                ],
-                            },
-                        )
-                        if response.status_code == 200:
-                            data = response.json()
-                            if "choices" in data and data["choices"]:
-                                return data["choices"][0]["message"]["content"]
-                            else:
-                                errors.append("Groq: empty response")
-                        elif response.status_code == 429:
-                            retry_after = int(response.headers.get("retry-after", 5 + attempt * 10))
-                            logger.warning(f"Groq rate limited (attempt {attempt+1}/2), waiting {retry_after}s")
-                            await asyncio.sleep(retry_after)
-                        else:
-                            errors.append(f"Groq: HTTP {response.status_code}")
-                except Exception as e:
-                    errors.append(f"Groq: {e}")
-                    logger.warning(f"Groq failed: {e}")
-            if not any("Groq:" in e for e in errors):
-                errors.append("Groq: rate limited after retries")
-
-        elif provider == "gemini":
-            gemini_key = os.getenv("GEMINI_API_KEY")
-            if not gemini_key:
-                errors.append("Gemini: no API key")
-                continue
-            for attempt in range(2):
-                try:
-                    async with httpx.AsyncClient(timeout=60.0) as client:
-                        response = await client.post(
-                            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={gemini_key}",
-                            headers={"Content-Type": "application/json"},
-                            json={
-                                "contents": [{"parts": [{"text": f"{system_prompt}\n\n{user_prompt}"}]}],
-                                "generationConfig": {"maxOutputTokens": 4096, "temperature": 0.2},
-                            },
-                        )
-                        if response.status_code == 200:
-                            data = response.json()
-                            text = data["candidates"][0]["content"]["parts"][0]["text"]
-                            return text
-                        elif response.status_code == 429:
-                            wait = 10 + attempt * 20
-                            logger.warning(f"Gemini rate limited (attempt {attempt+1}/2), waiting {wait}s")
-                            await asyncio.sleep(wait)
-                        else:
-                            errors.append(f"Gemini: HTTP {response.status_code}")
-                except Exception as e:
-                    errors.append(f"Gemini: {e}")
-                    logger.warning(f"Gemini failed: {e}")
-            if not any("Gemini:" in e for e in errors):
-                errors.append("Gemini: rate limited after retries")
-
-    logger.error(f"All providers failed: {errors}")
-    raise HTTPException(status_code=502, detail=f"Providers failed: {'; '.join(errors)}")
+    raise HTTPException(status_code=502, detail="Groq rate limited — please wait a moment and try again")
 
 
 def parse_agent_json(raw: str, agent_name: str) -> list | dict:
