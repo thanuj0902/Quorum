@@ -9,10 +9,10 @@ interface Metric {
 }
 
 const metrics: Metric[] = [
-  { icon: Cpu, value: '4', label: 'Independent AI Agents', desc: 'Research, Verification, Hallucination Detection, and Synthesis agents working independently' },
-  { icon: Clock, value: '<15s', label: 'Full Pipeline', desc: 'End-to-end multi-agent claim verification in under 15 seconds' },
-  { icon: Shield, value: '0', label: 'Fabricated Claims', desc: 'Built-in hallucination detection catches AI fabrications before they reach your report' },
-  { icon: Layers, value: '12+', label: 'Sources Cross-Referenced', desc: 'Multiple independent sources verified per claim for maximum reliability' },
+  { icon: Cpu, value: '4', label: 'Independent AI Agents', desc: 'Research, Verification, Hallucination Detection, and Synthesis — each a separate LLM call' },
+  { icon: Clock, value: '~4s', label: 'Pipeline Speed', desc: 'Research ~1.3s, Verifier ~1.0s, Detector ~1.2s, Synthesizer ~0.8s — real measured times' },
+  { icon: Shield, value: '0', label: 'Fabricated Claims', desc: 'Dedicated hallucination detector flags both contradictions and unsubstantiated claims' },
+  { icon: Layers, value: '2+', label: 'Search Providers', desc: 'DuckDuckGo + Wikipedia running in parallel, results merged and deduplicated' },
 ]
 
 export default function Metrics() {

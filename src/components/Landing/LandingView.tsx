@@ -3,7 +3,9 @@ import Logo from '../ui/Logo'
 import ThemeToggle from '../ui/ThemeToggle'
 import ShareMenu from '../ui/ShareMenu'
 import Hero from './Hero'
+import StatsBar from './StatsBar'
 import HowItWorks from './HowItWorks'
+import DemoPreview from './DemoPreview'
 import WhyDifferent from './WhyDifferent'
 import Metrics from './Metrics'
 import UseCases from './UseCases'
@@ -44,7 +46,9 @@ export default function LandingView({ onStart, onHistory }: LandingViewProps) {
 
       <main id="main-content">
         <Hero onStart={onStart} />
+        <StatsBar />
         <HowItWorks />
+        <DemoPreview />
         <WhyDifferent />
         <Metrics />
         <UseCases />
