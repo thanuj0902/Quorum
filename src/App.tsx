@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
+import { useState, useEffect, useCallback, lazy, Suspense, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import ToastContainer from './components/ui/Toast'
-import { ThemeProvider } from './hooks/useTheme'
+import { ThemeProvider } from './hooks/ThemeProvider'
 import { usePipeline } from './hooks/usePipeline'
 import { useHistory, fetchReportFromServer } from './hooks/useHistory'
 import { useToast } from './hooks/useToast'
@@ -34,14 +34,15 @@ export default function App() {
   const { phase, pipelineState, report, error, runLivePipeline, runBatchPipeline } = usePipeline()
   const { history, stats, saveReport, deleteEntry, getEntry } = useHistory()
   const { toasts, addToast, removeToast } = useToast()
+  const getEntryRef = useRef(getEntry)
+  getEntryRef.current = getEntry
 
   useEffect(() => {
     const hash = window.location.hash.slice(1)
     if (hash) {
       setSelectedReportId(hash)
       setView('report')
-      // Try localStorage first, then server
-      const local = getEntry(hash)
+      const local = getEntryRef.current(hash)
       if (!local) {
         fetchReportFromServer(hash).then(serverData => {
           if (serverData) {

@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { memo } from 'react'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Copy, Check, ExternalLink, CheckCircle2, AlertTriangle, XCircle, ShieldCheck } from 'lucide-react'
 import Logo from '../ui/Logo'
