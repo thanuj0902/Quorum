@@ -1,14 +1,13 @@
 import { useState, useCallback } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, Plus, X, Zap, CheckCircle2, AlertTriangle, XCircle, Mic, MicOff, Sun, Moon } from 'lucide-react'
+import { ArrowLeft, Plus, X, Zap, CheckCircle2, AlertTriangle, XCircle, Mic, MicOff } from 'lucide-react'
 import Logo from '../ui/Logo'
+import ThemeToggle from '../ui/ThemeToggle'
 import { useVoiceInput } from '../../hooks/useVoiceInput'
-import { useTheme } from '../../hooks/useTheme'
 import type { VerificationReport } from '../../types'
 
 interface BatchViewProps {
   onBack: () => void
-  onSaveReport: (report: VerificationReport) => string
   onRunBatch: (topics: string[]) => Promise<{ topic: string; report: VerificationReport | null; status: string; error?: string }[]>
 }
 
@@ -21,7 +20,7 @@ interface BatchClaim {
   error?: string
 }
 
-export default function BatchView({ onBack, onSaveReport: _onSaveReport, onRunBatch }: BatchViewProps) {
+export default function BatchView({ onBack, onRunBatch }: BatchViewProps) {
   const [inputs, setInputs] = useState<BatchClaim[]>([
     { topic: '', status: 'pending', report: null },
     { topic: '', status: 'pending', report: null },
@@ -30,7 +29,6 @@ export default function BatchView({ onBack, onSaveReport: _onSaveReport, onRunBa
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const { isListening, transcript, isSupported: voiceSupported, startListening, stopListening, resetTranscript } = useVoiceInput()
   const [voiceTargetIndex, setVoiceTargetIndex] = useState<number | null>(null)
-  const { theme, toggle } = useTheme()
 
   const canAdd = inputs.length < 5
   const canVerify = inputs.some((c) => c.topic.trim()) && !isRunning
@@ -133,14 +131,7 @@ export default function BatchView({ onBack, onSaveReport: _onSaveReport, onRunBa
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <Logo onClick={onBack} />
           <div className="flex items-center gap-3">
-            <button
-              onClick={toggle}
-              className="w-9 h-9 flex items-center justify-center rounded-xl border border-border text-text-secondary transition-all duration-300 hover:border-accent/30 hover:text-text"
-              style={{ background: 'var(--color-surface)' }}
-              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-            >
-              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
+            <ThemeToggle />
             <button
               onClick={onBack}
               className="flex items-center gap-2 text-text-secondary hover:text-text text-sm transition-colors"

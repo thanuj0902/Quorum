@@ -148,11 +148,6 @@ export default function App() {
               >
                 <BatchView
                   onBack={() => setView('landing')}
-                  onSaveReport={(report) => {
-                    const id = saveReport(report)
-                    addToast('Report saved to history', 'success')
-                    return id
-                  }}
                   onRunBatch={runBatchPipeline}
                 />
               </motion.div>

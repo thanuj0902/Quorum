@@ -1,8 +1,7 @@
 import { History } from 'lucide-react'
-import { Moon, Sun } from 'lucide-react'
 import Logo from '../ui/Logo'
+import ThemeToggle from '../ui/ThemeToggle'
 import ShareMenu from '../ui/ShareMenu'
-import { useTheme } from '../../hooks/useTheme'
 import Hero from './Hero'
 import HowItWorks from './HowItWorks'
 import WhyDifferent from './WhyDifferent'
@@ -17,8 +16,6 @@ interface LandingViewProps {
 }
 
 export default function LandingView({ onStart, onHistory }: LandingViewProps) {
-  const { theme, toggle } = useTheme()
-
   return (
     <>
       <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4 bg-base/80 backdrop-blur-xl border-b border-border/50" role="navigation" aria-label="Main navigation">
@@ -31,14 +28,7 @@ export default function LandingView({ onStart, onHistory }: LandingViewProps) {
               <a href="#use-cases" className="text-text-secondary/50 text-xs hover:text-text-secondary transition-colors">Use Cases</a>
               <a href="#faq" className="text-text-secondary/50 text-xs hover:text-text-secondary transition-colors">FAQ</a>
             </div>
-            <button
-              onClick={toggle}
-              className="w-9 h-9 flex items-center justify-center rounded-xl border border-border text-text-secondary transition-all duration-300 hover:border-accent/30 hover:text-text"
-              style={{ background: 'var(--color-surface)' }}
-              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-            >
-              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
+            <ThemeToggle />
             <button
               onClick={onHistory}
               className="w-9 h-9 flex items-center justify-center rounded-xl border border-border text-text-secondary transition-all duration-300 hover:border-accent/30 hover:text-text"

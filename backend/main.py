@@ -128,7 +128,7 @@ def clean_json(text: str) -> str:
     return text.strip()
 
 
-async def call_llm(system_prompt: str, user_prompt: str, api_key: str) -> str:
+async def call_llm(system_prompt: str, user_prompt: str, api_key: str, max_tokens: int = 2048) -> str:
     if not api_key:
         raise HTTPException(status_code=500, detail="No Groq API key provided")
 
@@ -140,7 +140,7 @@ async def call_llm(system_prompt: str, user_prompt: str, api_key: str) -> str:
                     headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                     json={
                         "model": "llama-3.1-8b-instant",
-                        "max_tokens": 2048,
+                        "max_tokens": max_tokens,
                         "temperature": 0.2,
                         "messages": [
                             {"role": "system", "content": system_prompt},
@@ -420,7 +420,7 @@ def _match_claim_to_source(claim: dict, search_results: list[dict]) -> str | Non
             best_url = r.get("url")
     return best_url
 
-async def research_agent(topic: str, api_key: str, search_results: list[dict] | None = None, provider: str = "groq") -> tuple[list[dict], dict]:
+async def research_agent(topic: str, api_key: str, search_results: list[dict] | None = None) -> tuple[list[dict], dict]:
     safe_topic = sanitize_input(topic)
 
     # Build context from real search results if available
@@ -473,7 +473,7 @@ Return a JSON array. No markdown, no explanation.'''
     }
 
 
-async def verifier_agent(claims: list[dict], topic: str, api_key: str, search_results: list[dict] | None = None, provider: str = "gemini") -> tuple[list[dict], dict]:
+async def verifier_agent(claims: list[dict], topic: str, api_key: str, search_results: list[dict] | None = None) -> tuple[list[dict], dict]:
     safe_topic = sanitize_input(topic)
     claims_text = "\n".join([
         f"- {c.get('claim', '')} (Source: {c.get('source', 'unknown')}, Category: {c.get('category', 'general')}, Confidence: {c.get('confidence', 0)})"
@@ -532,7 +532,7 @@ Return JSON array with: claim, source, source_url, confidence, verification_stat
     }
 
 
-async def contradiction_agent(verified_claims: list[dict], topic: str, api_key: str, provider: str = "groq") -> tuple[list[dict], dict]:
+async def contradiction_agent(verified_claims: list[dict], topic: str, api_key: str) -> tuple[list[dict], dict]:
     safe_topic = sanitize_input(topic)
     claims_text = "\n".join([
         f"- {c.get('claim', '')} [Status: {c.get('verification_status', 'unknown')}, Confidence: {c.get('confidence', 0)}, Supporting: {', '.join(c.get('supporting_sources', [])[:3])}, Contradicting: {', '.join(c.get('contradicting_sources', [])[:3])}]"
@@ -540,29 +540,18 @@ async def contradiction_agent(verified_claims: list[dict], topic: str, api_key: 
     ])
 
     system = (
-        "You are the Contradiction and Hallucination Detector in Quorum's multi-agent pipeline. "
-        "Detect TWO types of issues:\n"
-        "1. DIRECT CONTRADICTIONS — sources disagree on the same claim\n"
-        "2. UNSUBSTANTIATED — claim cannot be verified by any independent source (hallucination)\n\n"
-        "Return ONLY valid JSON — no markdown, no explanation outside the JSON."
+        "Contradiction Detector. For each claim return: claim, flag_type (none/direct_contradiction/unsubstantiated), "
+        "reason (1 sentence), severity (none/low/medium/high), contradicting_sources (array). "
+        "Return JSON array only. No markdown."
     )
-    prompt = f'''Analyze these claims about: "{safe_topic}"
-
-Claims:
+    prompt = f'''Topic: "{safe_topic}"
 {claims_text}
 
-For EACH claim return:
-- claim: the claim text
-- flag_type: "none", "direct_contradiction", or "unsubstantiated"
-- reason: 1-2 sentence explanation
-- severity: none, low, medium, high
-- contradicting_sources: list (empty if flag_type is "none")
-
-Return a JSON array. No markdown.'''
+Flag contradictions or hallucinations. Return JSON array with claim, flag_type, reason, severity, contradicting_sources.'''
 
     start = time.time()
     try:
-        result = await call_llm(system, prompt, api_key)
+        result = await call_llm(system, prompt, api_key, max_tokens=1024)
         flags = parse_agent_json(result, "Contradiction Detector")
     except Exception as e:
         logger.error(f"Contradiction Detector LLM failed: {e} — returning empty flags")
@@ -586,7 +575,6 @@ async def synthesizer_agent(
     verified_claims: list[dict],
     hallucinations: list[dict],
     api_key: str,
-    provider: str = "gemini",
 ) -> tuple[dict, dict]:
     safe_topic = sanitize_input(topic)
     claims_text = "\n".join([
@@ -612,7 +600,7 @@ Return JSON: {{"summary": "...", "confidence_reasoning": "1-2 sentences"}}'''
 
     start = time.time()
     try:
-        result = await call_llm(system, prompt, api_key)
+        result = await call_llm(system, prompt, api_key, max_tokens=512)
         report_data = parse_agent_json(result, "Synthesizer")
     except Exception as e:
         logger.error(f"Synthesizer LLM failed: {e} — using fallback summary")

@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from 'react'
 import { AGENT_IDS, AGENT_MAP } from '../data/agents'
 import type { PipelineState, PipelinePhase, VerificationReport, AgentId } from '../types'
 
-const RAILWAY_URL = 'https://quorum-production-4df3.up.railway.app'
+const RAILWAY_URL = import.meta.env.VITE_API_URL || 'https://quorum-production-4df3.up.railway.app'
 
 interface UsePipelineReturn {
   phase: PipelinePhase
@@ -26,6 +26,7 @@ export function usePipeline(): UsePipelineReturn {
   const [error, setError] = useState<string | null>(null)
   const completedCountRef = useRef(0)
   const agentStartTimes = useRef<Record<string, number>>({})
+  const phaseRef = useRef<PipelinePhase>('idle')
 
   const updateState = useCallback((updates: Partial<PipelineState>) => {
     setPipelineState(prev => ({ ...prev, ...updates }))
@@ -48,6 +49,7 @@ export function usePipeline(): UsePipelineReturn {
   const runLivePipeline = useCallback(async (topic: string): Promise<void> => {
     resetPipeline()
     setPhase('running')
+    phaseRef.current = 'running'
     updateState({ currentLog: 'Connecting to multi-agent backend...' })
 
     try {
@@ -129,6 +131,7 @@ export function usePipeline(): UsePipelineReturn {
               updateState({ activeAgent: null, currentLog: 'Pipeline complete — report generated' })
               setReport(parsed.report)
               setPhase('complete')
+              phaseRef.current = 'complete'
               return
             }
           } catch {
@@ -138,7 +141,7 @@ export function usePipeline(): UsePipelineReturn {
       }
 
       // If we exit the loop without getting a 'complete' event, check for fallback
-      if (phase === 'running') {
+      if (phaseRef.current === 'running') {
         throw new Error('Stream ended without completing')
       }
     } catch (err) {
@@ -184,6 +187,7 @@ export function usePipeline(): UsePipelineReturn {
             updateState({ activeAgent: null, currentLog: 'Pipeline complete — report generated' })
             setReport(data.report)
             setPhase('complete')
+            phaseRef.current = 'complete'
             return
           }
           throw new Error('Invalid response from backend')
@@ -192,6 +196,7 @@ export function usePipeline(): UsePipelineReturn {
           setError(`Backend unavailable: ${fallbackMsg}. Please check that the backend is running and try again.`)
           updateState({ currentLog: 'Backend unavailable — check backend connection' })
           setPhase('idle')
+          phaseRef.current = 'idle'
           return
         }
       }
@@ -199,6 +204,7 @@ export function usePipeline(): UsePipelineReturn {
       setError(`Backend unavailable: ${message}. Please check that the backend is running and try again.`)
       updateState({ currentLog: 'Backend unavailable — check backend connection' })
       setPhase('idle')
+      phaseRef.current = 'idle'
     }
   }, [updateState, resetPipeline])
 
